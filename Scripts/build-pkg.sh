@@ -45,10 +45,20 @@ cat > "$PKG_SCRIPTS/postinstall" <<'SCRIPT'
 #!/bin/bash
 set -euo pipefail
 
+APP_PATH="/Applications/Dictation.app"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+/usr/bin/touch "$APP_PATH" || true
+if [ -x "$LSREGISTER" ]; then
+  "$LSREGISTER" -f "$APP_PATH" >/dev/null 2>&1 || true
+fi
+/usr/bin/qlmanage -r cache >/dev/null 2>&1 || true
+
 logged_in_user="$(/usr/bin/stat -f %Su /dev/console)"
 if [ -n "$logged_in_user" ] && [ "$logged_in_user" != "root" ]; then
   user_id="$(/usr/bin/id -u "$logged_in_user")"
-  /bin/launchctl asuser "$user_id" /usr/bin/open -a "/Applications/Dictation.app" >/dev/null 2>&1 || true
+  /bin/launchctl asuser "$user_id" /usr/bin/osascript -e 'tell application "Finder" to update POSIX file "/Applications/Dictation.app"' >/dev/null 2>&1 || true
+  /bin/launchctl asuser "$user_id" /usr/bin/open -a "$APP_PATH" >/dev/null 2>&1 || true
 fi
 
 exit 0
@@ -61,7 +71,7 @@ COPYFILE_DISABLE=1 COPY_EXTENDED_ATTRIBUTES_DISABLE=1 pkgbuild \
   --scripts "$PKG_SCRIPTS" \
   --install-location "/" \
   --identifier "dev.denis.Dictation.pkg" \
-  --version "0.1.0" \
+  --version "0.1.1" \
   "$PKG_PATH"
 
 echo "Built $PKG_PATH"

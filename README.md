@@ -29,7 +29,7 @@ Scripts/build-dmg.sh
 open build/Dictation.dmg
 ```
 
-The DMG contains `Install Dictation.pkg`. The package installer is idempotent: it quits a running Dictation instance, removes previous `Dictation.app` duplicates in `/Applications`, installs one fresh `/Applications/Dictation.app`, and launches it.
+The DMG contains `Install Dictation.pkg`. The package installer is idempotent: it quits a running Dictation instance, removes previous `Dictation.app` duplicates in `/Applications`, installs one fresh `/Applications/Dictation.app`, refreshes LaunchServices/QuickLook icon caches, and launches it.
 
 ## Test
 
