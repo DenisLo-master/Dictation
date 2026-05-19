@@ -291,8 +291,10 @@ final class DictationController {
                 return
             }
 
+            let insertedText = TranscriptInsertionFormatter.format(text)
+
             do {
-                let pasteTarget = try await pasteInjector.insert(text, into: insertionTarget)
+                let pasteTarget = try await pasteInjector.insert(insertedText, into: insertionTarget)
                 queue.complete(job)
                 if visualFeedback {
                     overlay.flashSuccessAndHide()
@@ -300,7 +302,7 @@ final class DictationController {
                 onStatusChange?("Вставлено.")
                 logger.log(.info, "transcription_inserted", metadata: [
                     "audio_id": job.id,
-                    "chars": "\(text.count)",
+                    "chars": "\(insertedText.count)",
                     "target": pasteTarget?.localizedName ?? "frontmost"
                 ])
             } catch PasteInjector.PasteError.accessibilityPermissionMissing {
@@ -313,7 +315,7 @@ final class DictationController {
                 logger.log(.error, "paste_blocked_accessibility_transcript_deleted", metadata: [
                     "audio_id": job.id,
                     "attempt": "\(job.attempts)",
-                    "chars": "\(text.count)"
+                    "chars": "\(insertedText.count)"
                 ])
                 return
             }

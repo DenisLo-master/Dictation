@@ -140,3 +140,9 @@ public enum TranscriptCombiner {
         return "\(left) \(cleanRight)"
     }
 }
+
+public enum TranscriptInsertionFormatter {
+    public static func format(_ transcript: String) -> String {
+        " \(transcript)"
+    }
+}

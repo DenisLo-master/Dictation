@@ -30,6 +30,7 @@ enum DictationTestsRunner {
             TestCase(name: "hotkey captures F13-F20 but rejects ordinary keys", run: testFunctionHotkeys),
             TestCase(name: "OpenAI model list filters and prioritizes transcription models", run: testModelFiltering),
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
+            TestCase(name: "transcript formatter adds leading insertion space", run: testTranscriptInsertionFormatter),
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
             TestCase(name: "audio level meter maps voice volume without fake movement", run: testAudioLevelMeter),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
@@ -127,6 +128,13 @@ func testTranscriptCombiner() async throws {
     try expect(
         TranscriptCombiner.combine(["alpha beta", "gamma delta"]) == "alpha beta gamma delta",
         "Non-overlapping text should be joined with one space"
+    )
+}
+
+func testTranscriptInsertionFormatter() async throws {
+    try expect(
+        TranscriptInsertionFormatter.format("привет") == " привет",
+        "Inserted transcript should start with one leading space"
     )
 }
 
