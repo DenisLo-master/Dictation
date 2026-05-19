@@ -116,17 +116,24 @@ private final class EqualizerView: NSView {
 
     private var levels: [CGFloat] = Array(repeating: 0.2, count: 16)
     private var phase: CGFloat = 0
+    private var smoothedLevel: CGFloat = 0.08
 
     override var isFlipped: Bool { false }
 
     func setLevel(_ level: CGFloat) {
-        let clamped = max(0.02, min(1.0, pow(level, 0.62)))
-        levels = levels.enumerated().map { index, current in
-            let wave = 0.64 + 0.36 * sin(CGFloat(index) * 0.82 + phase)
-            let target = max(0.03, min(1.0, clamped * wave + CGFloat.random(in: -0.10...0.16)))
-            return current * 0.48 + target * 0.52
+        let lifted = max(0.04, min(1.0, pow(level, 0.46)))
+        let attack: CGFloat = lifted > smoothedLevel ? 0.48 : 0.24
+        smoothedLevel += (lifted - smoothedLevel) * attack
+        phase += 0.32 + smoothedLevel * 0.12
+
+        levels = levels.indices.map { index in
+            let position = CGFloat(index) / CGFloat(max(1, levels.count - 1))
+            let centerEnvelope = 0.44 + 0.56 * pow(sin(.pi * position), 0.55)
+            let wave = 0.78 + 0.22 * sin(phase + CGFloat(index) * 0.82)
+            let shimmer = 0.045 * sin(phase * 1.7 + CGFloat(index) * 1.43)
+            return max(0.06, min(1.0, smoothedLevel * centerEnvelope * wave + shimmer))
         }
-        phase += 0.26
+
         needsDisplay = true
     }
 
@@ -193,18 +200,22 @@ private final class EqualizerView: NSView {
     private func drawCells(in rect: NSRect) {
         let color = activeColor()
         let cell: CGFloat = 4
-        let gap: CGFloat = 2
-        let rows = 5
+        let gap: CGFloat = 1.5
+        let rows = 6
 
         for (column, level) in levels.enumerated() {
             let activeRows = max(1, min(rows, Int(ceil(level * CGFloat(rows)))))
             let x = rect.minX + CGFloat(column) * (cell + gap)
 
-            for row in 0..<activeRows {
+            for row in 0..<rows {
                 let y = rect.minY + CGFloat(row) * (cell + gap) + 1
-                let alpha = 0.36 + 0.12 * CGFloat(row + 1)
                 let path = NSBezierPath(roundedRect: NSRect(x: x, y: y, width: cell, height: cell), xRadius: 1.1, yRadius: 1.1)
-                color.withAlphaComponent(min(0.95, alpha)).setFill()
+                if row < activeRows {
+                    let alpha = 0.40 + 0.085 * CGFloat(row + 1)
+                    color.withAlphaComponent(min(0.96, alpha)).setFill()
+                } else {
+                    color.withAlphaComponent(0.11).setFill()
+                }
                 path.fill()
             }
         }
@@ -215,7 +226,7 @@ private final class EqualizerView: NSView {
         case .preparing:
             return .tertiaryLabelColor
         case .recording:
-            return .systemTeal
+            return NSColor(calibratedRed: 0.20, green: 0.92, blue: 0.86, alpha: 1)
         case .transcribing:
             return .systemIndigo
         case .success:

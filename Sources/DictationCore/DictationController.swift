@@ -24,6 +24,7 @@ final class DictationController {
     private var isHotkeyCaptureActive = false
     private var pendingStartTask: Task<Void, Never>?
     private var insertionTargetApplication: NSRunningApplication?
+    private var hasLoggedPendingAccessibilityBlock = false
 
     private let hotkeyHoldDebounceNanoseconds: UInt64 = 180_000_000
 
@@ -57,7 +58,7 @@ final class DictationController {
     func requestPermissions() {
         AudioRecorder.requestPermission { [weak self] granted in
             Task { @MainActor in
-                let accessibility = self?.pasteInjector.requestAccessibilityPermission() ?? false
+                let accessibility = self?.pasteInjector.requestAccessibilityPermission(openSettings: true) ?? false
                 if granted && accessibility {
                     self?.onStatusChange?("Разрешения выданы.")
                     self?.logger.log(.info, "permissions_ok")
@@ -86,6 +87,18 @@ final class DictationController {
 
         let jobs = queue.loadPending()
         guard !jobs.isEmpty else { return }
+
+        guard pasteInjector.hasAccessibilityPermission() else {
+            onStatusChange?("Есть сохраненные записи. Разрешите Accessibility для вставки.")
+            if !hasLoggedPendingAccessibilityBlock {
+                logger.log(.warning, "pending_blocked_accessibility_permission_missing", metadata: [
+                    "count": "\(jobs.count)"
+                ])
+                hasLoggedPendingAccessibilityBlock = true
+            }
+            return
+        }
+        hasLoggedPendingAccessibilityBlock = false
 
         isProcessingQueue = true
         onStatusChange?("Есть сохраненные записи. Отправляю...")
@@ -158,6 +171,12 @@ final class DictationController {
             return
         }
 
+        guard ensureAccessibilityPermission(prompt: true, audioID: nil) else {
+            overlay.flashFailureAndHide()
+            insertionTargetApplication = nil
+            return
+        }
+
         do {
             overlay.showPreparing()
             try recorder.start()
@@ -225,34 +244,52 @@ final class DictationController {
         var chunksToCleanup: [AudioChunk] = []
 
         do {
-            job = try queue.markAttempt(job)
-            let chunks = try await chunker.chunks(for: job)
-            chunksToCleanup = chunks
-            logger.log(.info, "transcription_upload_started", metadata: [
-                "audio_id": job.id,
-                "attempt": "\(job.attempts)",
-                "chunks": "\(chunks.count)",
-                "sha256": job.sha256
-            ])
-
-            var transcriptParts: [String] = []
-            for chunk in chunks {
-                let text = try await transcriber.transcribe(
-                    fileURL: chunk.fileURL,
-                    apiKey: apiKey,
-                    model: settings.model
-                )
-                transcriptParts.append(text)
-                logger.log(.info, "chunk_transcribed", metadata: [
-                    "audio_id": job.id,
-                    "chunk": "\(chunk.index)",
-                    "start": String(format: "%.1f", chunk.start),
-                    "end": String(format: "%.1f", chunk.end)
-                ])
+            guard ensureAccessibilityPermission(prompt: visualFeedback, audioID: initialJob.id) else {
+                if visualFeedback {
+                    overlay.flashFailureAndHide()
+                }
+                return
             }
 
-            chunker.cleanup(chunks, preserving: job.fileURL)
-            let text = TranscriptCombiner.combine(transcriptParts)
+            let text: String
+            if let savedTranscript = job.transcript?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !savedTranscript.isEmpty {
+                text = savedTranscript
+                logger.log(.info, "transcript_loaded_from_queue", metadata: [
+                    "audio_id": job.id,
+                    "chars": "\(savedTranscript.count)"
+                ])
+            } else {
+                job = try queue.markAttempt(job)
+                let chunks = try await chunker.chunks(for: job)
+                chunksToCleanup = chunks
+                logger.log(.info, "transcription_upload_started", metadata: [
+                    "audio_id": job.id,
+                    "attempt": "\(job.attempts)",
+                    "chunks": "\(chunks.count)",
+                    "sha256": job.sha256
+                ])
+
+                var transcriptParts: [String] = []
+                for chunk in chunks {
+                    let text = try await transcriber.transcribe(
+                        fileURL: chunk.fileURL,
+                        apiKey: apiKey,
+                        model: settings.model
+                    )
+                    transcriptParts.append(text)
+                    logger.log(.info, "chunk_transcribed", metadata: [
+                        "audio_id": job.id,
+                        "chunk": "\(chunk.index)",
+                        "start": String(format: "%.1f", chunk.start),
+                        "end": String(format: "%.1f", chunk.end)
+                    ])
+                }
+
+                chunker.cleanup(chunks, preserving: job.fileURL)
+                chunksToCleanup = []
+                text = TranscriptCombiner.combine(transcriptParts)
+            }
 
             guard !text.isEmpty else {
                 if visualFeedback {
@@ -263,7 +300,25 @@ final class DictationController {
                 return
             }
 
-            try await pasteInjector.insert(text, into: insertionTarget)
+            job = try queue.saveTranscript(text, for: job)
+
+            do {
+                try await pasteInjector.insert(text, into: insertionTarget)
+            } catch PasteInjector.PasteError.accessibilityPermissionMissing {
+                _ = pasteInjector.requestAccessibilityPermission(openSettings: visualFeedback)
+                if visualFeedback {
+                    overlay.flashFailureAndHide()
+                }
+                onStatusChange?("Текст распознан и сохранен. Разрешите Accessibility для вставки.")
+                logger.log(.error, "paste_blocked_accessibility_transcript_saved", metadata: [
+                    "audio_id": job.id,
+                    "attempt": "\(job.attempts)",
+                    "path": job.filePath,
+                    "chars": "\(text.count)"
+                ])
+                return
+            }
+
             queue.complete(job)
             if visualFeedback {
                 overlay.flashSuccessAndHide()
@@ -287,6 +342,26 @@ final class DictationController {
                 "message": error.localizedDescription
             ])
         }
+    }
+
+    private func ensureAccessibilityPermission(prompt: Bool, audioID: String?) -> Bool {
+        guard pasteInjector.hasAccessibilityPermission() else {
+            if prompt {
+                _ = pasteInjector.requestAccessibilityPermission(openSettings: true)
+            }
+
+            var metadata = [
+                "message": "Accessibility permission is required before transcription upload."
+            ]
+            if let audioID {
+                metadata["audio_id"] = audioID
+            }
+            logger.log(.warning, "accessibility_permission_required", metadata: metadata)
+            onStatusChange?("Разрешите Accessibility: Privacy & Security -> Accessibility -> Dictation.")
+            return false
+        }
+
+        return true
     }
 
     private func startLevelTimer() {

@@ -10,7 +10,7 @@ final class PasteInjector {
         var errorDescription: String? {
             switch self {
             case .accessibilityPermissionMissing:
-                "Accessibility permission is required to paste into another app."
+                "Для вставки текста в другое приложение нужен Accessibility-доступ."
             }
         }
     }
@@ -19,12 +19,18 @@ final class PasteInjector {
         let items: [[NSPasteboard.PasteboardType: Data]]
     }
 
-    func requestAccessibilityPermission() -> Bool {
+    private var lastSettingsOpenAt: Date?
+
+    func requestAccessibilityPermission(openSettings: Bool = true) -> Bool {
         let options = [
             "AXTrustedCheckOptionPrompt": true
         ] as CFDictionary
 
-        return AXIsProcessTrustedWithOptions(options)
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        if openSettings, !trusted {
+            openAccessibilitySettingsThrottled()
+        }
+        return trusted
     }
 
     func hasAccessibilityPermission() -> Bool {
@@ -88,5 +94,18 @@ final class PasteInjector {
         keyDown?.post(tap: .cghidEventTap)
         usleep(30_000)
         keyUp?.post(tap: .cghidEventTap)
+    }
+
+    private func openAccessibilitySettingsThrottled() {
+        let now = Date()
+        if let lastSettingsOpenAt, now.timeIntervalSince(lastSettingsOpenAt) < 8 {
+            return
+        }
+        lastSettingsOpenAt = now
+
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 }
