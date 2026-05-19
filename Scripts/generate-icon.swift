@@ -28,6 +28,8 @@ guard let sourceImage = NSImage(contentsOf: sourceURL) else {
     fatalError("Could not read app icon source at \(sourceURL.path)")
 }
 
+let sourceCropRect = transparentContentRect(for: sourceImage)
+
 for (name, size) in specs {
     guard let bitmap = NSBitmapImageRep(
         bitmapDataPlanes: nil,
@@ -53,9 +55,11 @@ for (name, size) in specs {
     let rect = NSRect(x: 0, y: 0, width: size, height: size)
     NSColor.clear.setFill()
     rect.fill()
+    let drawHeight = size * (sourceCropRect.height / sourceCropRect.width)
+    let drawRect = NSRect(x: 0, y: size - drawHeight, width: size, height: drawHeight)
     sourceImage.draw(
-        in: rect,
-        from: NSRect(origin: .zero, size: sourceImage.size),
+        in: drawRect,
+        from: sourceCropRect,
         operation: .sourceOver,
         fraction: 1,
         respectFlipped: false,
@@ -70,4 +74,57 @@ for (name, size) in specs {
     }
 
     try data.write(to: outputURL.appendingPathComponent(name), options: .atomic)
+}
+
+func transparentContentRect(for image: NSImage) -> NSRect {
+    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        return NSRect(origin: .zero, size: image.size)
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    let bytesPerRow = width * 4
+    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+    let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+
+    guard let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: bitmapInfo
+    ) else {
+        return NSRect(origin: .zero, size: image.size)
+    }
+
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    var minX = width
+    var minY = height
+    var maxX = 0
+    var maxY = 0
+
+    for y in 0..<height {
+        for x in 0..<width {
+            let alpha = pixels[y * bytesPerRow + x * 4 + 3]
+            guard alpha > 8 else { continue }
+            minX = min(minX, x)
+            minY = min(minY, y)
+            maxX = max(maxX, x)
+            maxY = max(maxY, y)
+        }
+    }
+
+    guard minX <= maxX, minY <= maxY else {
+        return NSRect(origin: .zero, size: image.size)
+    }
+
+    return NSRect(
+        x: minX,
+        y: minY,
+        width: maxX - minX + 1,
+        height: maxY - minY + 1
+    )
 }

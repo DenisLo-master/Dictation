@@ -27,6 +27,7 @@ final class DictationController {
     private var hasLoggedPendingAccessibilityBlock = false
 
     private let hotkeyHoldDebounceNanoseconds: UInt64 = 180_000_000
+    private let minimumRecordingDuration: TimeInterval = 0.35
 
     init(settings: AppSettings, overlay: EqualizerOverlayController, logger: AppLogger) {
         self.settings = settings
@@ -203,6 +204,18 @@ final class DictationController {
 
         do {
             let result = try recorder.stop()
+            guard result.duration >= minimumRecordingDuration else {
+                try? FileManager.default.removeItem(at: result.fileURL)
+                isBusy = false
+                insertionTargetApplication = nil
+                overlay.hide()
+                onStatusChange?("Слишком короткая запись удалена.")
+                logger.log(.warning, "recording_discarded_too_short", metadata: [
+                    "duration": String(format: "%.3fs", result.duration)
+                ])
+                return
+            }
+
             let job = try queue.enqueue(tempFileURL: result.fileURL, duration: result.duration)
             overlay.setTranscribing()
             onStatusChange?("Запись сохранена. Распознаю...")
@@ -244,6 +257,20 @@ final class DictationController {
         var chunksToCleanup: [AudioChunk] = []
 
         do {
+            guard job.duration >= minimumRecordingDuration else {
+                queue.complete(job)
+                if visualFeedback {
+                    overlay.flashFailureAndHide()
+                }
+                onStatusChange?("Слишком короткая запись удалена.")
+                logger.log(.warning, "pending_discarded_too_short", metadata: [
+                    "audio_id": job.id,
+                    "duration": String(format: "%.3fs", job.duration),
+                    "path": job.filePath
+                ])
+                return
+            }
+
             guard ensureAccessibilityPermission(prompt: visualFeedback, audioID: initialJob.id) else {
                 if visualFeedback {
                     overlay.flashFailureAndHide()
@@ -343,6 +370,21 @@ final class DictationController {
             }
         } catch {
             chunker.cleanup(chunksToCleanup, preserving: job.fileURL)
+            if isTerminalAudioFileError(error) {
+                queue.complete(job)
+                if visualFeedback {
+                    overlay.flashFailureAndHide()
+                }
+                onStatusChange?("Поврежденная запись удалена. Запишите заново.")
+                logger.log(.error, "transcription_terminal_audio_discarded", metadata: [
+                    "audio_id": job.id,
+                    "attempt": "\(job.attempts)",
+                    "path": job.filePath,
+                    "message": error.localizedDescription
+                ])
+                return
+            }
+
             if visualFeedback {
                 overlay.flashFailureAndHide()
             }
@@ -354,6 +396,17 @@ final class DictationController {
                 "message": error.localizedDescription
             ])
         }
+    }
+
+    private func isTerminalAudioFileError(_ error: Error) -> Bool {
+        guard case OpenAITranscriber.TranscriberError.serverError(400, let body) = error else {
+            return false
+        }
+
+        return body.contains("\"param\": \"file\"")
+            || body.contains("\"param\":\"file\"")
+            || body.localizedCaseInsensitiveContains("Audio file might be corrupted")
+            || body.localizedCaseInsensitiveContains("unsupported")
     }
 
     private func ensureAccessibilityPermission(prompt: Bool, audioID: String?) -> Bool {
