@@ -25,7 +25,15 @@ final class EqualizerOverlayController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
     }
 
-    func show() {
+    func showPreparing() {
+        stopPulse()
+        positionBottomRight()
+        equalizerView.mode = .preparing
+        equalizerView.setLevel(0)
+        panel.orderFrontRegardless()
+    }
+
+    func showRecording() {
         stopPulse()
         positionBottomRight()
         equalizerView.mode = .recording
@@ -95,6 +103,7 @@ final class EqualizerOverlayController {
 @MainActor
 private final class EqualizerView: NSView {
     enum Mode {
+        case preparing
         case recording
         case transcribing
         case success
@@ -111,13 +120,13 @@ private final class EqualizerView: NSView {
     override var isFlipped: Bool { false }
 
     func setLevel(_ level: CGFloat) {
-        let clamped = max(0.05, min(1.0, level))
+        let clamped = max(0.02, min(1.0, pow(level, 0.62)))
         levels = levels.enumerated().map { index, current in
-            let wave = 0.68 + 0.32 * sin(CGFloat(index) * 0.82 + phase)
-            let target = max(0.08, min(1.0, clamped * wave + CGFloat.random(in: -0.12...0.12)))
-            return current * 0.58 + target * 0.42
+            let wave = 0.64 + 0.36 * sin(CGFloat(index) * 0.82 + phase)
+            let target = max(0.03, min(1.0, clamped * wave + CGFloat.random(in: -0.10...0.16)))
+            return current * 0.48 + target * 0.52
         }
-        phase += 0.2
+        phase += 0.26
         needsDisplay = true
     }
 
@@ -142,7 +151,11 @@ private final class EqualizerView: NSView {
         background.stroke()
 
         drawMicrophone(in: NSRect(x: 17, y: 13, width: 22, height: 24))
-        drawCells(in: NSRect(x: 49, y: 10, width: 87, height: 30))
+        if mode == .preparing {
+            drawPreparingDots(in: NSRect(x: 55, y: 22, width: 62, height: 6))
+        } else {
+            drawCells(in: NSRect(x: 49, y: 10, width: 87, height: 30))
+        }
     }
 
     private func drawMicrophone(in rect: NSRect) {
@@ -199,6 +212,8 @@ private final class EqualizerView: NSView {
 
     private func activeColor() -> NSColor {
         switch mode {
+        case .preparing:
+            return .tertiaryLabelColor
         case .recording:
             return .systemTeal
         case .transcribing:
@@ -207,6 +222,16 @@ private final class EqualizerView: NSView {
             return .systemGreen
         case .failure:
             return .systemRed
+        }
+    }
+
+    private func drawPreparingDots(in rect: NSRect) {
+        let color = NSColor.tertiaryLabelColor
+        for index in 0..<3 {
+            let x = rect.minX + CGFloat(index) * 14
+            let path = NSBezierPath(ovalIn: NSRect(x: x, y: rect.minY, width: 6, height: 6))
+            color.withAlphaComponent(0.5 + CGFloat(index) * 0.14).setFill()
+            path.fill()
         }
     }
 }

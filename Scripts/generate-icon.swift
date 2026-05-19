@@ -59,69 +59,96 @@ func drawIcon(size: CGFloat) {
     NSColor.clear.setFill()
     rect.fill()
 
-    let bgRect = rect.insetBy(dx: size * 0.075, dy: size * 0.075)
-    let bg = NSBezierPath(roundedRect: bgRect, xRadius: size * 0.235, yRadius: size * 0.235)
+    let bgRect = rect.insetBy(dx: size * 0.08, dy: size * 0.08)
+    let bg = NSBezierPath(roundedRect: bgRect, xRadius: size * 0.22, yRadius: size * 0.22)
     let gradient = NSGradient(colors: [
-        NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.14, alpha: 1),
-        NSColor(calibratedRed: 0.01, green: 0.02, blue: 0.04, alpha: 1)
+        NSColor(calibratedRed: 0.18, green: 0.19, blue: 0.21, alpha: 1),
+        NSColor(calibratedRed: 0.02, green: 0.025, blue: 0.035, alpha: 1)
     ])
-    gradient?.draw(in: bg, angle: 230)
+    gradient?.draw(in: bg, angle: 235)
 
-    NSColor(calibratedWhite: 1, alpha: 0.16).setStroke()
-    bg.lineWidth = max(1, size * 0.012)
+    NSColor(calibratedWhite: 1, alpha: 0.18).setStroke()
+    bg.lineWidth = max(1, size * 0.01)
     bg.stroke()
 
-    let shine = NSBezierPath(roundedRect: bgRect.insetBy(dx: size * 0.05, dy: size * 0.055), xRadius: size * 0.18, yRadius: size * 0.18)
-    NSColor.white.withAlphaComponent(0.055).setFill()
-    shine.fill()
+    // Diagonal glossy facet, matching the selected black glass reference.
+    let facet = NSBezierPath()
+    facet.move(to: NSPoint(x: bgRect.maxX - size * 0.02, y: bgRect.maxY - size * 0.02))
+    facet.line(to: NSPoint(x: bgRect.maxX - size * 0.02, y: bgRect.minY + size * 0.12))
+    facet.line(to: NSPoint(x: bgRect.minX + size * 0.40, y: bgRect.minY + size * 0.12))
+    facet.close()
+    NSColor.black.withAlphaComponent(0.28).setFill()
+    facet.fill()
 
-    let micColor = NSColor(calibratedRed: 0.36, green: 0.96, blue: 0.94, alpha: 1)
-    let laptopColor = NSColor(calibratedWhite: 0.94, alpha: 0.88)
+    let highlight = NSBezierPath()
+    highlight.move(to: NSPoint(x: bgRect.minX + size * 0.13, y: bgRect.maxY - size * 0.03))
+    highlight.curve(
+        to: NSPoint(x: bgRect.maxX - size * 0.04, y: bgRect.maxY - size * 0.12),
+        controlPoint1: NSPoint(x: bgRect.minX + size * 0.40, y: bgRect.maxY + size * 0.06),
+        controlPoint2: NSPoint(x: bgRect.maxX - size * 0.13, y: bgRect.maxY + size * 0.02)
+    )
+    NSColor.white.withAlphaComponent(0.12).setStroke()
+    highlight.lineWidth = max(1, size * 0.018)
+    highlight.stroke()
 
-    let laptopScreen = NSRect(x: size * 0.27, y: size * 0.18, width: size * 0.46, height: size * 0.26)
-    let screen = NSBezierPath(roundedRect: laptopScreen, xRadius: size * 0.045, yRadius: size * 0.045)
-    laptopColor.withAlphaComponent(0.30).setFill()
-    screen.fill()
-    laptopColor.withAlphaComponent(0.62).setStroke()
-    screen.lineWidth = max(1.2, size * 0.025)
-    screen.stroke()
+    let laptopColor = NSColor(calibratedWhite: 0.90, alpha: 0.86)
+    let baseShadow = NSBezierPath(roundedRect: NSRect(x: size * 0.20, y: size * 0.165, width: size * 0.60, height: size * 0.060), xRadius: size * 0.030, yRadius: size * 0.030)
+    NSColor.black.withAlphaComponent(0.36).setFill()
+    baseShadow.fill()
 
-    let base = NSBezierPath(roundedRect: NSRect(x: size * 0.2, y: size * 0.12, width: size * 0.6, height: size * 0.075), xRadius: size * 0.036, yRadius: size * 0.036)
+    let base = NSBezierPath(roundedRect: NSRect(x: size * 0.18, y: size * 0.185, width: size * 0.64, height: size * 0.060), xRadius: size * 0.030, yRadius: size * 0.030)
     laptopColor.setFill()
     base.fill()
 
-    let micRect = NSRect(x: size * 0.39, y: size * 0.42, width: size * 0.22, height: size * 0.33)
-    let capsule = NSBezierPath(roundedRect: micRect, xRadius: size * 0.11, yRadius: size * 0.11)
-    micColor.setFill()
+    let screenLine = NSBezierPath()
+    screenLine.move(to: NSPoint(x: size * 0.255, y: size * 0.255))
+    screenLine.line(to: NSPoint(x: size * 0.745, y: size * 0.255))
+    NSColor.white.withAlphaComponent(0.16).setStroke()
+    screenLine.lineWidth = max(1, size * 0.012)
+    screenLine.stroke()
+
+    let white = NSColor(calibratedWhite: 0.94, alpha: 1)
+    let ringRect = NSRect(x: size * 0.245, y: size * 0.255, width: size * 0.51, height: size * 0.51)
+    let ring = NSBezierPath(ovalIn: ringRect)
+    white.withAlphaComponent(0.92).setStroke()
+    ring.lineWidth = max(1.3, size * 0.022)
+    ring.stroke()
+
+    let micRect = NSRect(x: size * 0.415, y: size * 0.455, width: size * 0.17, height: size * 0.205)
+    let capsule = NSBezierPath(roundedRect: micRect, xRadius: size * 0.085, yRadius: size * 0.085)
+    white.setFill()
     capsule.fill()
 
-    NSColor.black.withAlphaComponent(0.22).setFill()
-    NSBezierPath(roundedRect: micRect.insetBy(dx: size * 0.045, dy: size * 0.055), xRadius: size * 0.04, yRadius: size * 0.04).fill()
+    for offset in [-0.040, 0.0, 0.040] {
+        let line = NSBezierPath()
+        line.move(to: NSPoint(x: size * 0.455, y: size * (0.525 + offset)))
+        line.line(to: NSPoint(x: size * 0.545, y: size * (0.525 + offset)))
+        NSColor.black.withAlphaComponent(0.42).setStroke()
+        line.lineWidth = max(1, size * 0.012)
+        line.stroke()
+    }
 
     let arc = NSBezierPath()
     arc.appendArc(
-        withCenter: NSPoint(x: size * 0.5, y: size * 0.43),
-        radius: size * 0.19,
+        withCenter: NSPoint(x: size * 0.5, y: size * 0.415),
+        radius: size * 0.155,
         startAngle: 205,
         endAngle: 335,
         clockwise: false
     )
-    micColor.setStroke()
-    arc.lineWidth = size * 0.048
+    white.setStroke()
+    arc.lineWidth = max(1.6, size * 0.030)
     arc.stroke()
 
     let stem = NSBezierPath()
-    stem.move(to: NSPoint(x: size * 0.5, y: size * 0.28))
-    stem.line(to: NSPoint(x: size * 0.5, y: size * 0.38))
-    stem.lineWidth = size * 0.048
+    stem.move(to: NSPoint(x: size * 0.5, y: size * 0.285))
+    stem.line(to: NSPoint(x: size * 0.5, y: size * 0.370))
+    stem.lineWidth = max(1.6, size * 0.030)
     stem.stroke()
 
-    for index in 0..<4 {
-        let height = size * CGFloat([0.10, 0.16, 0.13, 0.2][index])
-        let x = size * (0.66 + CGFloat(index) * 0.055)
-        let y = size * 0.49
-        let cell = NSBezierPath(roundedRect: NSRect(x: x, y: y, width: size * 0.028, height: height), xRadius: size * 0.012, yRadius: size * 0.012)
-        micColor.withAlphaComponent(0.72).setFill()
-        cell.fill()
-    }
+    let micBase = NSBezierPath()
+    micBase.move(to: NSPoint(x: size * 0.42, y: size * 0.285))
+    micBase.line(to: NSPoint(x: size * 0.58, y: size * 0.285))
+    micBase.lineWidth = max(1.6, size * 0.030)
+    micBase.stroke()
 }

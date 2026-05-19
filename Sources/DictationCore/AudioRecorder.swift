@@ -74,10 +74,14 @@ final class AudioRecorder {
         guard let recorder else { return 0 }
 
         recorder.updateMeters()
-        let power = recorder.averagePower(forChannel: 0)
-        guard power.isFinite else { return 0 }
+        let averagePower = recorder.averagePower(forChannel: 0)
+        let peakPower = recorder.peakPower(forChannel: 0)
+        guard averagePower.isFinite, peakPower.isFinite else { return 0 }
 
-        let normalized = pow(10, power / 20)
-        return CGFloat(max(0.04, min(1.0, normalized * 3.0)))
+        let averageLinear = pow(10, averagePower / 20)
+        let peakLinear = pow(10, peakPower / 20)
+        let dbLift = max(0, min(1, (averagePower + 56) / 38))
+        let boosted = max(averageLinear * 8.0, peakLinear * 4.5, dbLift)
+        return CGFloat(max(0.03, min(1.0, boosted)))
     }
 }

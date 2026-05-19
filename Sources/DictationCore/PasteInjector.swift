@@ -4,6 +4,17 @@ import Carbon
 
 @MainActor
 final class PasteInjector {
+    enum PasteError: LocalizedError {
+        case accessibilityPermissionMissing
+
+        var errorDescription: String? {
+            switch self {
+            case .accessibilityPermissionMissing:
+                "Accessibility permission is required to paste into another app."
+            }
+        }
+    }
+
     private struct PasteboardSnapshot {
         let items: [[NSPasteboard.PasteboardType: Data]]
     }
@@ -16,18 +27,30 @@ final class PasteInjector {
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    func insert(_ text: String) {
+    func hasAccessibilityPermission() -> Bool {
+        AXIsProcessTrusted()
+    }
+
+    func insert(_ text: String, into targetApplication: NSRunningApplication?) async throws {
+        guard hasAccessibilityPermission() else {
+            throw PasteError.accessibilityPermissionMissing
+        }
+
         let pasteboard = NSPasteboard.general
         let snapshot = capture(pasteboard)
+
+        if let targetApplication, !targetApplication.isTerminated {
+            targetApplication.activate(options: [.activateAllWindows])
+            try? await Task.sleep(nanoseconds: 180_000_000)
+        }
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 
         sendPasteShortcut()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.restore(snapshot, to: pasteboard)
-        }
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        restore(snapshot, to: pasteboard)
     }
 
     private func capture(_ pasteboard: NSPasteboard) -> PasteboardSnapshot {
@@ -63,6 +86,7 @@ final class PasteInjector {
         keyDown?.flags = .maskCommand
         keyUp?.flags = .maskCommand
         keyDown?.post(tap: .cghidEventTap)
+        usleep(30_000)
         keyUp?.post(tap: .cghidEventTap)
     }
 }

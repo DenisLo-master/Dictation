@@ -22,6 +22,10 @@ final class DictationController {
     private var isBusy = false
     private var isProcessingQueue = false
     private var isHotkeyCaptureActive = false
+    private var pendingStartTask: Task<Void, Never>?
+    private var insertionTargetApplication: NSRunningApplication?
+
+    private let hotkeyHoldDebounceNanoseconds: UInt64 = 180_000_000
 
     init(settings: AppSettings, overlay: EqualizerOverlayController, logger: AppLogger) {
         self.settings = settings
@@ -72,6 +76,7 @@ final class DictationController {
         isHotkeyCaptureActive = active
         if active {
             isHotkeyDown = false
+            cancelPendingStart()
         }
     }
 
@@ -83,19 +88,16 @@ final class DictationController {
         guard !jobs.isEmpty else { return }
 
         isProcessingQueue = true
-        overlay.show()
-        overlay.setTranscribing()
         onStatusChange?("Есть сохраненные записи. Отправляю...")
 
         Task {
             defer {
                 isProcessingQueue = false
-                overlay.hide()
             }
 
             for job in jobs {
                 guard !isBusy else { break }
-                await process(job)
+                await process(job, visualFeedback: false, insertionTarget: nil)
             }
         }
     }
@@ -107,11 +109,44 @@ final class DictationController {
 
         if hotkey.isPressed(by: event), !isHotkeyDown {
             isHotkeyDown = true
-            beginRecording()
+            insertionTargetApplication = currentInsertionTarget()
+            scheduleRecordingStart()
         } else if hotkey.isReleased(by: event), isHotkeyDown {
             isHotkeyDown = false
-            finishRecording()
+            if recorder.isRecording {
+                finishRecording()
+            } else {
+                cancelPendingStart()
+            }
         }
+    }
+
+    private func scheduleRecordingStart() {
+        guard pendingStartTask == nil else { return }
+
+        pendingStartTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: self?.hotkeyHoldDebounceNanoseconds ?? 180_000_000)
+            await MainActor.run {
+                guard let self, self.isHotkeyDown, !Task.isCancelled else { return }
+                self.pendingStartTask = nil
+                self.beginRecording()
+            }
+        }
+    }
+
+    private func cancelPendingStart() {
+        pendingStartTask?.cancel()
+        pendingStartTask = nil
+    }
+
+    private func currentInsertionTarget() -> NSRunningApplication? {
+        guard
+            let app = NSWorkspace.shared.frontmostApplication,
+            app.bundleIdentifier != AppPaths.bundleIdentifier
+        else {
+            return nil
+        }
+        return app
     }
 
     private func beginRecording() {
@@ -124,14 +159,19 @@ final class DictationController {
         }
 
         do {
+            overlay.showPreparing()
             try recorder.start()
             isBusy = true
-            overlay.show()
+            overlay.showRecording()
             onStatusChange?("Запись...")
-            logger.log(.info, "recording_started", metadata: ["hotkey": settings.hotkey.displayName])
+            logger.log(.info, "recording_started", metadata: [
+                "hotkey": settings.hotkey.displayName,
+                "target": insertionTargetApplication?.localizedName ?? "frontmost"
+            ])
             startLevelTimer()
         } catch {
             isBusy = false
+            insertionTargetApplication = nil
             overlay.hide()
             onStatusChange?("Не удалось начать запись: \(error.localizedDescription)")
             logger.log(.error, "recording_start_failed", metadata: ["message": error.localizedDescription])
@@ -154,20 +194,28 @@ final class DictationController {
             ])
 
             Task {
-                await process(job)
+                await process(job, visualFeedback: true, insertionTarget: insertionTargetApplication)
                 isBusy = false
+                insertionTargetApplication = nil
             }
         } catch {
             isBusy = false
+            insertionTargetApplication = nil
             overlay.hide()
             onStatusChange?("Не удалось сохранить запись: \(error.localizedDescription)")
             logger.log(.error, "recording_finish_failed", metadata: ["message": error.localizedDescription])
         }
     }
 
-    private func process(_ initialJob: RecordingJob) async {
+    private func process(
+        _ initialJob: RecordingJob,
+        visualFeedback: Bool,
+        insertionTarget: NSRunningApplication?
+    ) async {
         guard let apiKey = settings.apiKey, !apiKey.isEmpty else {
-            overlay.hide()
+            if visualFeedback {
+                overlay.hide()
+            }
             onStatusChange?("OpenAI API key не найден.")
             logger.log(.warning, "transcription_blocked_no_token", metadata: ["audio_id": initialJob.id])
             return
@@ -207,23 +255,30 @@ final class DictationController {
             let text = TranscriptCombiner.combine(transcriptParts)
 
             guard !text.isEmpty else {
-                overlay.hide()
+                if visualFeedback {
+                    overlay.hide()
+                }
                 onStatusChange?("Пустая транскрибация.")
                 logger.log(.warning, "empty_transcription", metadata: ["audio_id": job.id])
                 return
             }
 
-            pasteInjector.insert(text)
+            try await pasteInjector.insert(text, into: insertionTarget)
             queue.complete(job)
-            overlay.flashSuccessAndHide()
+            if visualFeedback {
+                overlay.flashSuccessAndHide()
+            }
             onStatusChange?("Вставлено.")
             logger.log(.info, "transcription_inserted", metadata: [
                 "audio_id": job.id,
-                "chars": "\(text.count)"
+                "chars": "\(text.count)",
+                "target": insertionTarget?.localizedName ?? "frontmost"
             ])
         } catch {
             chunker.cleanup(chunksToCleanup, preserving: job.fileURL)
-            overlay.flashFailureAndHide()
+            if visualFeedback {
+                overlay.flashFailureAndHide()
+            }
             onStatusChange?("Ошибка. Аудио сохранено и будет повторено.")
             logger.log(.error, "transcription_failed_audio_preserved", metadata: [
                 "audio_id": job.id,
