@@ -161,9 +161,12 @@ func testAudioLevelMeter() async throws {
     let initial = history.levels
     let afterSilence = history.push(0)
     let afterLoud = history.push(0.9)
+    let activeColumns = afterLoud.filter { $0 > 0.3 }.count
+    let afterDrop = history.push(0)
 
     try expect(afterSilence.last ?? 1 <= initial.last ?? 1, "Silence should not create decorative movement")
-    try expect(afterLoud.last ?? 0 > afterSilence.last ?? 0, "New voice level should drive the newest column")
+    try expect(activeColumns >= 3, "Voice should drive the whole equalizer, not only a delayed history column")
+    try expect((afterDrop.max() ?? 1) < (afterLoud.max() ?? 0), "Equalizer should release quickly when voice drops")
 }
 
 func testRecordingQueue() async throws {

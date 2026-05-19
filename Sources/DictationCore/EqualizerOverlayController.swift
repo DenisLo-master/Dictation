@@ -210,17 +210,22 @@ private final class EqualizerView: NSView {
         let rows = 6
 
         for (column, level) in levels.enumerated() {
-            let activeRows = max(0, min(rows, Int(ceil(level * CGFloat(rows)))))
+            let scaledLevel = max(0, min(CGFloat(rows), level * CGFloat(rows)))
+            let fullRows = Int(floor(scaledLevel))
+            let partialRow = min(1, max(0, scaledLevel - CGFloat(fullRows)))
             let x = rect.minX + CGFloat(column) * (cell + gap)
 
             for row in 0..<rows {
                 let y = rect.minY + CGFloat(row) * (cell + gap) + 1
                 let path = NSBezierPath(roundedRect: NSRect(x: x, y: y, width: cell, height: cell), xRadius: 1.1, yRadius: 1.1)
-                if row < activeRows {
-                    let alpha = 0.40 + 0.085 * CGFloat(row + 1)
-                    color.withAlphaComponent(min(0.96, alpha)).setFill()
+                if row < fullRows {
+                    let alpha = 0.48 + 0.075 * CGFloat(row + 1)
+                    color.withAlphaComponent(min(0.98, alpha)).setFill()
+                } else if row == fullRows, partialRow > 0.05 {
+                    let alpha = 0.16 + 0.56 * partialRow + 0.04 * CGFloat(row)
+                    color.withAlphaComponent(min(0.92, alpha)).setFill()
                 } else {
-                    color.withAlphaComponent(0.11).setFill()
+                    color.withAlphaComponent(0.08).setFill()
                 }
                 path.fill()
             }

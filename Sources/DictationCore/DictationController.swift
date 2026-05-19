@@ -380,7 +380,7 @@ final class DictationController {
 
     private func startLevelTimer() {
         levelTimer?.invalidate()
-        levelTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        levelTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.overlay.update(level: self.recorder.currentLevel())
