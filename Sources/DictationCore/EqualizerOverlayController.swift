@@ -29,6 +29,7 @@ final class EqualizerOverlayController {
         stopPulse()
         positionBottomRight()
         equalizerView.mode = .preparing
+        equalizerView.resetLevels()
         equalizerView.setLevel(0)
         panel.orderFrontRegardless()
     }
@@ -37,6 +38,7 @@ final class EqualizerOverlayController {
         stopPulse()
         positionBottomRight()
         equalizerView.mode = .recording
+        equalizerView.resetLevels()
         panel.orderFrontRegardless()
     }
 
@@ -115,23 +117,24 @@ private final class EqualizerView: NSView {
     }
 
     private var levels: [CGFloat] = Array(repeating: 0.2, count: 16)
+    private var levelHistory = VoiceLevelHistory(columnCount: 16)
     private var phase: CGFloat = 0
-    private var smoothedLevel: CGFloat = 0.08
 
     override var isFlipped: Bool { false }
 
-    func setLevel(_ level: CGFloat) {
-        let lifted = max(0.04, min(1.0, pow(level, 0.46)))
-        let attack: CGFloat = lifted > smoothedLevel ? 0.48 : 0.24
-        smoothedLevel += (lifted - smoothedLevel) * attack
-        phase += 0.32 + smoothedLevel * 0.12
+    func resetLevels() {
+        levelHistory.reset()
+        levels = levelHistory.levels
+        phase = 0
+        needsDisplay = true
+    }
 
-        levels = levels.indices.map { index in
-            let position = CGFloat(index) / CGFloat(max(1, levels.count - 1))
-            let centerEnvelope = 0.44 + 0.56 * pow(sin(.pi * position), 0.55)
-            let wave = 0.78 + 0.22 * sin(phase + CGFloat(index) * 0.82)
-            let shimmer = 0.045 * sin(phase * 1.7 + CGFloat(index) * 1.43)
-            return max(0.06, min(1.0, smoothedLevel * centerEnvelope * wave + shimmer))
+    func setLevel(_ level: CGFloat) {
+        let clamped = max(0, min(1, level))
+        if mode == .recording {
+            levels = levelHistory.push(clamped)
+        } else {
+            levels = Array(repeating: max(0.02, clamped), count: levels.count)
         }
 
         needsDisplay = true
@@ -204,7 +207,7 @@ private final class EqualizerView: NSView {
         let rows = 6
 
         for (column, level) in levels.enumerated() {
-            let activeRows = max(1, min(rows, Int(ceil(level * CGFloat(rows)))))
+            let activeRows = max(0, min(rows, Int(ceil(level * CGFloat(rows)))))
             let x = rect.minX + CGFloat(column) * (cell + gap)
 
             for row in 0..<rows {

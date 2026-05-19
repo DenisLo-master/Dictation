@@ -31,6 +31,7 @@ enum DictationTestsRunner {
             TestCase(name: "OpenAI model list filters and prioritizes transcription models", run: testModelFiltering),
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
+            TestCase(name: "audio level meter maps voice volume without fake movement", run: testAudioLevelMeter),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
             TestCase(name: "recording queue persists transcript for paste retry", run: testRecordingQueueTranscriptPersistence),
             TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger),
@@ -144,6 +145,24 @@ func testChunkPlanner() async throws {
     try expect(large[0] == AudioChunkPlan(index: 0, start: 0, end: 41), "First chunk should include forward overlap")
     try expect(large[1] == AudioChunkPlan(index: 1, start: 39, end: 81), "Middle chunk should overlap both sides")
     try expect(large[2] == AudioChunkPlan(index: 2, start: 79, end: 120), "Last chunk should include backward overlap only")
+}
+
+func testAudioLevelMeter() async throws {
+    let silence = AudioLevelMeter.normalizedLevel(averagePower: -80, peakPower: -80)
+    let quiet = AudioLevelMeter.normalizedLevel(averagePower: -48, peakPower: -42)
+    let loud = AudioLevelMeter.normalizedLevel(averagePower: -24, peakPower: -16)
+
+    try expect(silence == 0, "Silence should be gated to zero")
+    try expect(quiet > silence, "Quiet voice should register above silence")
+    try expect(loud > quiet, "Louder voice should produce a higher level")
+
+    var history = VoiceLevelHistory(columnCount: 4)
+    let initial = history.levels
+    let afterSilence = history.push(0)
+    let afterLoud = history.push(0.9)
+
+    try expect(afterSilence.last ?? 1 <= initial.last ?? 1, "Silence should not create decorative movement")
+    try expect(afterLoud.last ?? 0 > afterSilence.last ?? 0, "New voice level should drive the newest column")
 }
 
 func testRecordingQueue() async throws {
