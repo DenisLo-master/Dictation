@@ -32,6 +32,7 @@ enum DictationTestsRunner {
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
             TestCase(name: "audio level meter maps voice volume without fake movement", run: testAudioLevelMeter),
+            TestCase(name: "focused input policy accepts only writable text roles", run: testFocusedInputPolicy),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
             TestCase(name: "recording queue persists transcript for paste retry", run: testRecordingQueueTranscriptPersistence),
             TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger),
@@ -150,11 +151,13 @@ func testChunkPlanner() async throws {
 func testAudioLevelMeter() async throws {
     let silence = AudioLevelMeter.normalizedLevel(averagePower: -80, peakPower: -80)
     let quiet = AudioLevelMeter.normalizedLevel(averagePower: -48, peakPower: -42)
+    let normalSpeech = AudioLevelMeter.normalizedLevel(averagePower: -24, peakPower: -12)
     let loud = AudioLevelMeter.normalizedLevel(averagePower: -24, peakPower: -16)
 
     try expect(silence == 0, "Silence should be gated to zero")
     try expect(quiet > silence, "Quiet voice should register above silence")
     try expect(loud > quiet, "Louder voice should produce a higher level")
+    try expect(normalSpeech < 0.75, "Normal speech should not pin the equalizer to the top")
 
     var history = VoiceLevelHistory(columnCount: 4)
     let initial = history.levels
@@ -163,6 +166,29 @@ func testAudioLevelMeter() async throws {
 
     try expect(afterSilence.last ?? 1 <= initial.last ?? 1, "Silence should not create decorative movement")
     try expect(afterLoud.last ?? 0 > afterSilence.last ?? 0, "New voice level should drive the newest column")
+}
+
+func testFocusedInputPolicy() async throws {
+    try expect(
+        FocusedTextInputPolicy.isWritable(role: "AXTextArea", subrole: nil),
+        "Text areas should accept paste"
+    )
+    try expect(
+        FocusedTextInputPolicy.isWritable(role: "AXTextField", subrole: nil),
+        "Text fields should accept paste"
+    )
+    try expect(
+        FocusedTextInputPolicy.isWritable(role: "AXGroup", subrole: "AXSecureTextField"),
+        "Secure text subroles should accept paste"
+    )
+    try expect(
+        !FocusedTextInputPolicy.isWritable(role: "AXButton", subrole: nil),
+        "Buttons should not accept delayed paste"
+    )
+    try expect(
+        !FocusedTextInputPolicy.isWritable(role: nil, subrole: nil),
+        "Missing focused role should not accept delayed paste"
+    )
 }
 
 func testRecordingQueue() async throws {

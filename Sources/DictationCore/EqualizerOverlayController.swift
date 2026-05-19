@@ -52,6 +52,7 @@ final class EqualizerOverlayController {
     }
 
     func setTranscribing() {
+        stopPulse()
         equalizerView.mode = .transcribing
         if !panel.isVisible {
             positionBottomRight()
@@ -163,6 +164,8 @@ private final class EqualizerView: NSView {
         drawMicrophone(in: NSRect(x: 17, y: 13, width: 22, height: 24))
         if mode == .preparing {
             drawPreparingDots(in: NSRect(x: 55, y: 22, width: 62, height: 6))
+        } else if mode == .transcribing {
+            drawSpinner(in: NSRect(x: 78, y: 12, width: 26, height: 26))
         } else {
             drawCells(in: NSRect(x: 49, y: 10, width: 87, height: 30))
         }
@@ -247,5 +250,32 @@ private final class EqualizerView: NSView {
             color.withAlphaComponent(0.5 + CGFloat(index) * 0.14).setFill()
             path.fill()
         }
+    }
+
+    private func drawSpinner(in rect: NSRect) {
+        let color = activeColor()
+        let segments = 10
+        let center = NSPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) * 0.39
+        let segmentSize = NSSize(width: 4.0, height: 4.0)
+        let activeIndex = Int(phase * 10).positiveModulo(segments)
+
+        for index in 0..<segments {
+            let angle = (CGFloat(index) / CGFloat(segments)) * .pi * 2 - .pi / 2
+            let x = center.x + cos(angle) * radius - segmentSize.width / 2
+            let y = center.y + sin(angle) * radius - segmentSize.height / 2
+            let distance = (index - activeIndex + segments) % segments
+            let alpha = max(0.16, 0.98 - CGFloat(distance) * 0.095)
+            let dot = NSBezierPath(roundedRect: NSRect(origin: NSPoint(x: x, y: y), size: segmentSize), xRadius: 1.5, yRadius: 1.5)
+            color.withAlphaComponent(alpha).setFill()
+            dot.fill()
+        }
+    }
+}
+
+private extension Int {
+    func positiveModulo(_ divisor: Int) -> Int {
+        let result = self % divisor
+        return result >= 0 ? result : result + divisor
     }
 }

@@ -5,12 +5,12 @@ public enum AudioLevelMeter {
     public static func normalizedLevel(averagePower: Float, peakPower: Float) -> CGFloat {
         guard averagePower.isFinite, peakPower.isFinite else { return 0 }
 
-        let average = decibelToUnit(averagePower, noiseFloor: -62, ceiling: -14)
-        let peak = decibelToUnit(peakPower, noiseFloor: -54, ceiling: -8)
-        let mixed = average * 0.68 + peak * 0.32
-        let gated = max(0, (mixed - 0.055) / 0.945)
+        let average = decibelToUnit(averagePower, noiseFloor: -62, ceiling: -6)
+        let peak = decibelToUnit(peakPower, noiseFloor: -52, ceiling: -2)
+        let mixed = average * 0.75 + peak * 0.25
+        let gated = max(0, (mixed - 0.08) / 0.92)
 
-        return max(0, min(1, pow(gated, 0.68)))
+        return max(0, min(1, pow(gated, 1.28) * 0.96))
     }
 
     private static func decibelToUnit(_ power: Float, noiseFloor: Float, ceiling: Float) -> CGFloat {
@@ -43,7 +43,7 @@ public struct VoiceLevelHistory {
         let attack: CGFloat = level > smoothedLevel ? 0.74 : 0.20
         smoothedLevel += (level - smoothedLevel) * attack
 
-        let displayLevel = max(floor, min(1, pow(smoothedLevel, 0.86)))
+        let displayLevel = max(floor, min(1, pow(smoothedLevel, 1.08)))
         levels.removeFirst()
         levels.append(displayLevel)
         return levels

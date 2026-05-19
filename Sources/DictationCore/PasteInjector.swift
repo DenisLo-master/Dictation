@@ -6,11 +6,14 @@ import Carbon
 final class PasteInjector {
     enum PasteError: LocalizedError {
         case accessibilityPermissionMissing
+        case focusedTextInputMissing
 
         var errorDescription: String? {
             switch self {
             case .accessibilityPermissionMissing:
                 "Для вставки текста в другое приложение нужен Accessibility-доступ."
+            case .focusedTextInputMissing:
+                "Активное поле ввода не найдено."
             }
         }
     }
@@ -37,7 +40,7 @@ final class PasteInjector {
         AXIsProcessTrusted()
     }
 
-    func insert(_ text: String, into targetApplication: NSRunningApplication?) async throws {
+    func insert(_ text: String, into targetApplication: NSRunningApplication?) async throws -> NSRunningApplication? {
         guard hasAccessibilityPermission() else {
             throw PasteError.accessibilityPermissionMissing
         }
@@ -45,9 +48,8 @@ final class PasteInjector {
         let pasteboard = NSPasteboard.general
         let snapshot = capture(pasteboard)
 
-        if let targetApplication, !targetApplication.isTerminated {
-            targetApplication.activate(options: [.activateAllWindows])
-            try? await Task.sleep(nanoseconds: 180_000_000)
+        guard let pasteTarget = currentPasteTarget(), focusedTextInputExists(in: pasteTarget) else {
+            throw PasteError.focusedTextInputMissing
         }
 
         pasteboard.clearContents()
@@ -57,6 +59,7 @@ final class PasteInjector {
 
         try? await Task.sleep(nanoseconds: 1_200_000_000)
         restore(snapshot, to: pasteboard)
+        return pasteTarget
     }
 
     private func capture(_ pasteboard: NSPasteboard) -> PasteboardSnapshot {
@@ -82,6 +85,69 @@ final class PasteInjector {
         }
 
         pasteboard.writeObjects(items)
+    }
+
+    private func currentPasteTarget() -> NSRunningApplication? {
+        guard
+            let app = NSWorkspace.shared.frontmostApplication,
+            !app.isTerminated,
+            app.bundleIdentifier != AppPaths.bundleIdentifier
+        else {
+            return nil
+        }
+
+        return app
+    }
+
+    private func focusedTextInputExists(in targetApplication: NSRunningApplication?) -> Bool {
+        guard
+            let app = targetApplication ?? NSWorkspace.shared.frontmostApplication,
+            !app.isTerminated
+        else {
+            return false
+        }
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var focusedObject: CFTypeRef?
+        let focusedStatus = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        )
+
+        guard focusedStatus == .success, let focusedObject else {
+            return false
+        }
+
+        let focusedElement = focusedObject as! AXUIElement
+        let role = stringAttribute(kAXRoleAttribute, from: focusedElement)
+        let subrole = stringAttribute(kAXSubroleAttribute, from: focusedElement)
+        if FocusedTextInputPolicy.isWritable(role: role, subrole: subrole) {
+            return true
+        }
+
+        var parentObject: CFTypeRef?
+        let parentStatus = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXParentAttribute as CFString,
+            &parentObject
+        )
+
+        guard parentStatus == .success, let parentObject else {
+            return false
+        }
+
+        let parentElement = parentObject as! AXUIElement
+        let parentRole = stringAttribute(kAXRoleAttribute, from: parentElement)
+        let parentSubrole = stringAttribute(kAXSubroleAttribute, from: parentElement)
+        return FocusedTextInputPolicy.isWritable(role: parentRole, subrole: parentSubrole)
+    }
+
+    private func stringAttribute(_ attribute: String, from element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        guard status == .success else { return nil }
+        return value as? String
     }
 
     private func sendPasteShortcut() {

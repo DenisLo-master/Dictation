@@ -303,7 +303,17 @@ final class DictationController {
             job = try queue.saveTranscript(text, for: job)
 
             do {
-                try await pasteInjector.insert(text, into: insertionTarget)
+                let pasteTarget = try await pasteInjector.insert(text, into: insertionTarget)
+                queue.complete(job)
+                if visualFeedback {
+                    overlay.flashSuccessAndHide()
+                }
+                onStatusChange?("Вставлено.")
+                logger.log(.info, "transcription_inserted", metadata: [
+                    "audio_id": job.id,
+                    "chars": "\(text.count)",
+                    "target": pasteTarget?.localizedName ?? "frontmost"
+                ])
             } catch PasteInjector.PasteError.accessibilityPermissionMissing {
                 _ = pasteInjector.requestAccessibilityPermission(openSettings: visualFeedback)
                 if visualFeedback {
@@ -317,18 +327,20 @@ final class DictationController {
                     "chars": "\(text.count)"
                 ])
                 return
+            } catch PasteInjector.PasteError.focusedTextInputMissing {
+                queue.complete(job)
+                if visualFeedback {
+                    overlay.flashFailureAndHide()
+                }
+                onStatusChange?("Поле ввода не активно. Транскрипт удален.")
+                logger.log(.warning, "transcription_discarded_no_focused_input", metadata: [
+                    "audio_id": job.id,
+                    "attempt": "\(job.attempts)",
+                    "chars": "\(text.count)",
+                    "target": insertionTarget?.localizedName ?? "frontmost"
+                ])
+                return
             }
-
-            queue.complete(job)
-            if visualFeedback {
-                overlay.flashSuccessAndHide()
-            }
-            onStatusChange?("Вставлено.")
-            logger.log(.info, "transcription_inserted", metadata: [
-                "audio_id": job.id,
-                "chars": "\(text.count)",
-                "target": insertionTarget?.localizedName ?? "frontmost"
-            ])
         } catch {
             chunker.cleanup(chunksToCleanup, preserving: job.fileURL)
             if visualFeedback {
