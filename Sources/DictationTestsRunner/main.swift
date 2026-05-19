@@ -27,7 +27,7 @@ enum DictationTestsRunner {
     static func main() async {
         let tests: [TestCase] = [
             TestCase(name: "hotkey captures Fn/Globe and detects down/up", run: testFnHotkey),
-            TestCase(name: "hotkey captures F13-F20 but rejects ordinary keys", run: testFunctionHotkeys),
+            TestCase(name: "hotkey captures hold modifiers and F13-F20", run: testHoldHotkeys),
             TestCase(name: "OpenAI model list filters and prioritizes transcription models", run: testModelFiltering),
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
             TestCase(name: "transcript formatter adds leading insertion space", run: testTranscriptInsertionFormatter),
@@ -78,13 +78,26 @@ func testFnHotkey() async throws {
     try expect(captured.isReleased(by: fnUp), "Fn up event should be released")
 }
 
-func testFunctionHotkeys() async throws {
+func testHoldHotkeys() async throws {
+    let leftCommandDown = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_Command), flags: [.command])
+    let leftCommandUp = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_Command), flags: [])
+    let rightOptionDown = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_RightOption), flags: [.option])
+    let leftControlDown = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_Control), flags: [.control])
     let f19Down = try makeEvent(type: .keyDown, keyCode: UInt16(kVK_F19), flags: [])
     let f19Repeat = try makeEvent(type: .keyDown, keyCode: UInt16(kVK_F19), flags: [], isARepeat: true)
     let f19Up = try makeEvent(type: .keyUp, keyCode: UInt16(kVK_F19), flags: [])
     let aDown = try makeEvent(type: .keyDown, keyCode: 0, flags: [])
 
+    let leftCommand = try require(DictationHotkey.capture(from: leftCommandDown), "Expected left command hotkey capture")
+    let rightOption = try require(DictationHotkey.capture(from: rightOptionDown), "Expected right option hotkey capture")
+    let leftControl = try require(DictationHotkey.capture(from: leftControlDown), "Expected left control hotkey capture")
     let captured = try require(DictationHotkey.capture(from: f19Down), "Expected F19 hotkey capture")
+
+    try expect(leftCommand.displayName == "Left Command", "Left command should be captured distinctly")
+    try expect(leftCommand.isPressed(by: leftCommandDown), "Left command down should press")
+    try expect(leftCommand.isReleased(by: leftCommandUp), "Left command up should release")
+    try expect(rightOption.displayName == "Right Option", "Right option should still be supported")
+    try expect(leftControl.displayName == "Left Control", "Left control should be supported")
     try expect(captured.displayName == "F19", "Expected display name F19")
     try expect(captured.isPressed(by: f19Down), "F19 keyDown should press")
     try expect(!captured.isPressed(by: f19Repeat), "F19 repeat should not retrigger")
@@ -112,8 +125,9 @@ func testModelFiltering() async throws {
         ],
         "Transcription models should be filtered and preferred models prioritized"
     )
-    try expect(models.first?.badge == "быстро", "Mini model should be marked fast")
-    try expect(models[2].badge == "спикеры", "Diarize model should be marked as speaker-aware")
+    try expect(models.first?.badge == "fast", "Mini model should be marked fast")
+    try expect(models[2].badge == "speakers", "Diarize model should be marked as speaker-aware")
+    try expect(AppText.modelBadge(models[2].badge, language: .russian) == "спикеры", "Model badges should localize for the UI")
 }
 
 func testTranscriptCombiner() async throws {
@@ -262,7 +276,7 @@ func testSingleInstancePolicy() async throws {
 }
 
 func testAppMetadataFooter() async throws {
-    let footer = AppMetadata.footerText(version: "1.2.3")
+    let footer = AppMetadata.footerText(version: "1.2.3", language: .russian)
     try expect(footer.contains("Версия: 1.2.3"), "Footer should include localized version")
     try expect(footer.contains("Разработчик: denis.lkg@gmail.com"), "Footer should include developer email")
 }

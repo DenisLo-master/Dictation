@@ -161,7 +161,7 @@ private final class EqualizerView: NSView {
         background.lineWidth = 1
         background.stroke()
 
-        drawMicrophone(in: NSRect(x: 17, y: 13, width: 22, height: 24))
+        drawMicrophone(in: NSRect(x: 16, y: 9, width: 28, height: 32))
         if mode == .preparing {
             drawPreparingDots(in: NSRect(x: 55, y: 22, width: 62, height: 6))
         } else if mode == .transcribing {
@@ -172,35 +172,7 @@ private final class EqualizerView: NSView {
     }
 
     private func drawMicrophone(in rect: NSRect) {
-        let color = activeColor()
-        color.withAlphaComponent(0.95).setStroke()
-        color.withAlphaComponent(0.95).setFill()
-
-        let capsule = NSBezierPath(roundedRect: NSRect(x: rect.midX - 4, y: rect.minY + 8, width: 8, height: 14), xRadius: 4, yRadius: 4)
-        capsule.fill()
-
-        let arc = NSBezierPath()
-        arc.appendArc(
-            withCenter: NSPoint(x: rect.midX, y: rect.minY + 11),
-            radius: 8,
-            startAngle: 205,
-            endAngle: 335,
-            clockwise: false
-        )
-        arc.lineWidth = 2
-        arc.stroke()
-
-        let stem = NSBezierPath()
-        stem.move(to: NSPoint(x: rect.midX, y: rect.minY + 3))
-        stem.line(to: NSPoint(x: rect.midX, y: rect.minY + 8))
-        stem.lineWidth = 2
-        stem.stroke()
-
-        let base = NSBezierPath()
-        base.move(to: NSPoint(x: rect.midX - 6, y: rect.minY + 3))
-        base.line(to: NSPoint(x: rect.midX + 6, y: rect.minY + 3))
-        base.lineWidth = 2
-        base.stroke()
+        BadgeMicrophoneIcon.draw(in: rect, color: activeColor(), cutoutColor: .black)
     }
 
     private func drawCells(in rect: NSRect) {

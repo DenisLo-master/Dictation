@@ -13,6 +13,7 @@ final class SettingsPopoverViewController: NSViewController {
     var onRefreshModels: (() -> Void)?
     var onModelChange: ((String) -> Void)?
     var onHotkeyChange: ((DictationHotkey) -> Void)?
+    var onLanguageChange: ((AppLanguage) -> Void)?
     var onRequestPermissions: (() -> Void)?
     var onOpenLogs: (() -> Void)?
     var onLaunchAtLoginChange: ((Bool) -> Void)?
@@ -23,29 +24,49 @@ final class SettingsPopoverViewController: NSViewController {
     private let selectedModel: String
     private let initialModels: [TranscriptionModel]
     private let initialHotkey: DictationHotkey
+    private let initialLanguage: AppLanguage
     private let initialLaunchAtLogin: Bool
+    private var language: AppLanguage
+    private var currentModels: [TranscriptionModel] = []
 
     private let tokenField = PasteFriendlySecureTextField()
     private let validationImage = NSImageView()
     private let validationSpinner = NSProgressIndicator()
     private let saveButton = NSButton()
+    private let languagePopup = NSPopUpButton()
     private let modelPopup = NSPopUpButton()
+    private let refreshButton = NSButton()
     private let modelSpinner = NSProgressIndicator()
     private let hotkeyField = HotkeyRecorderField()
-    private let launchAtLoginButton = NSButton(checkboxWithTitle: "Запускать при входе", target: nil, action: nil)
+    private let launchAtLoginButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let statusLabel = NSTextField(labelWithString: "")
+    private let titleLabel = NSTextField(labelWithString: "Dictation")
+    private let languageLabel = NSTextField(labelWithString: "")
+    private let languageHintLabel = NSTextField(labelWithString: "")
+    private let tokenLabel = NSTextField(labelWithString: "")
+    private let modelLabel = NSTextField(labelWithString: "")
+    private let modelHintLabel = NSTextField(labelWithString: "")
+    private let hotkeyLabel = NSTextField(labelWithString: "")
+    private let resetHotkeyButton = NSButton()
+    private let permissionsButton = NSButton()
+    private let logsButton = NSButton()
+    private let quitButton = NSButton()
+    private let metadataLabel = NSTextField(labelWithString: "")
 
     init(
         savedToken: String,
         selectedModel: String,
         models: [TranscriptionModel],
         hotkey: DictationHotkey,
+        language: AppLanguage,
         launchAtLogin: Bool
     ) {
         self.savedToken = savedToken
         self.selectedModel = selectedModel
         self.initialModels = models
         self.initialHotkey = hotkey
+        self.initialLanguage = language
+        self.language = language
         self.initialLaunchAtLogin = launchAtLogin
         super.init(nibName: nil, bundle: nil)
     }
@@ -56,7 +77,7 @@ final class SettingsPopoverViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 370, height: 462))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 545))
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
     }
@@ -67,7 +88,10 @@ final class SettingsPopoverViewController: NSViewController {
         setValidationState(savedToken.isEmpty ? .idle : .success)
         setModels(initialModels, selectedModel: selectedModel)
         hotkeyField.hotkey = initialHotkey
+        hotkeyField.language = initialLanguage
+        selectLanguage(initialLanguage)
         setLaunchAtLogin(initialLaunchAtLogin)
+        applyLocalization()
     }
 
     func setStatus(_ value: String) {
@@ -81,25 +105,26 @@ final class SettingsPopoverViewController: NSViewController {
 
         switch state {
         case .idle:
-            validationImage.image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Не проверено")
+            validationImage.image = NSImage(systemSymbolName: "circle", accessibilityDescription: AppText.validationUnchecked(language))
             validationImage.contentTintColor = .tertiaryLabelColor
         case .loading:
             validationImage.isHidden = true
             validationSpinner.isHidden = false
             validationSpinner.startAnimation(nil)
         case .success:
-            validationImage.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Токен принят")
+            validationImage.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: AppText.validationAccepted(language))
             validationImage.contentTintColor = .systemGreen
         case .failure:
-            validationImage.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Ошибка токена")
+            validationImage.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: AppText.validationFailed(language))
             validationImage.contentTintColor = .systemRed
         }
     }
 
     func setModels(_ models: [TranscriptionModel], selectedModel: String) {
+        currentModels = models
         modelPopup.removeAllItems()
         for model in models {
-            modelPopup.addItem(withTitle: "\(model.id)  ·  \(model.badge)")
+            modelPopup.addItem(withTitle: "\(model.id)  ·  \(AppText.modelBadge(model.badge, language: language))")
             modelPopup.lastItem?.representedObject = model.id
         }
         selectModel(selectedModel)
@@ -128,6 +153,12 @@ final class SettingsPopoverViewController: NSViewController {
         launchAtLoginButton.state = enabled ? .on : .off
     }
 
+    func selectLanguage(_ selectedLanguage: AppLanguage) {
+        if let item = languagePopup.itemArray.first(where: { $0.representedObject as? String == selectedLanguage.rawValue }) {
+            languagePopup.select(item)
+        }
+    }
+
     private func buildUI() {
         let headerIcon = NSImageView()
         headerIcon.image = NSImage(systemSymbolName: "laptopcomputer.and.mic", accessibilityDescription: "Dictation")
@@ -135,15 +166,24 @@ final class SettingsPopoverViewController: NSViewController {
         headerIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 22, weight: .medium)
         headerIcon.contentTintColor = .controlAccentColor
 
-        let title = NSTextField(labelWithString: "Dictation")
-        title.font = .systemFont(ofSize: 18, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
 
-        let header = NSStackView(views: [headerIcon, title])
+        let header = NSStackView(views: [headerIcon, titleLabel])
         header.orientation = .horizontal
         header.alignment = .centerY
         header.spacing = 9
 
-        let tokenLabel = sectionLabel("OpenAI API Key")
+        configureSectionLabel(languageLabel)
+        configureHintLabel(languageHintLabel)
+        languagePopup.target = self
+        languagePopup.action = #selector(languageChanged)
+        languagePopup.removeAllItems()
+        for appLanguage in AppLanguage.allCases {
+            languagePopup.addItem(withTitle: appLanguage.displayName)
+            languagePopup.lastItem?.representedObject = appLanguage.rawValue
+        }
+
+        configureSectionLabel(tokenLabel)
         tokenField.placeholderString = "sk-..."
         tokenField.stringValue = savedToken
         tokenField.bezelStyle = .roundedBezel
@@ -173,7 +213,6 @@ final class SettingsPopoverViewController: NSViewController {
             validationSpinner.heightAnchor.constraint(equalToConstant: 18)
         ])
 
-        saveButton.title = "Сохранить"
         saveButton.bezelStyle = .rounded
         saveButton.target = self
         saveButton.action = #selector(saveToken)
@@ -184,8 +223,8 @@ final class SettingsPopoverViewController: NSViewController {
         tokenRow.spacing = 8
         tokenField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let modelLabel = sectionLabel("Модель транскрипции")
-        let refreshButton = iconButton("arrow.clockwise", action: #selector(refreshModels), accessibilityDescription: "Обновить модели")
+        configureSectionLabel(modelLabel)
+        configureIconButton(refreshButton, symbol: "arrow.clockwise", action: #selector(refreshModels), accessibilityDescription: AppText.refreshModels(language))
         modelSpinner.style = .spinning
         modelSpinner.controlSize = .small
         modelSpinner.isHidden = true
@@ -197,11 +236,11 @@ final class SettingsPopoverViewController: NSViewController {
 
         modelPopup.target = self
         modelPopup.action = #selector(modelChanged)
-        let modelHint = hintLabel("список загружается онлайн через OpenAI Models API")
+        configureHintLabel(modelHintLabel)
 
-        let hotkeyLabel = sectionLabel("Клавиша диктовки")
-        let resetHotkeyButton = NSButton(title: "Сбросить", target: self, action: #selector(resetHotkey))
         resetHotkeyButton.bezelStyle = .rounded
+        resetHotkeyButton.target = self
+        resetHotkeyButton.action = #selector(resetHotkey)
         hotkeyField.onCapture = { [weak self] hotkey in
             self?.onHotkeyChange?(hotkey)
         }
@@ -211,7 +250,8 @@ final class SettingsPopoverViewController: NSViewController {
         hotkeyField.onRecordingStateChange = { [weak self] isRecording in
             self?.onHotkeyRecordingStateChange?(isRecording)
             if isRecording {
-                self?.setStatus("Нажмите Fn, Right Option, Right Control, Right Command или F13-F20.")
+                guard let self else { return }
+                self.setStatus(AppText.hotkeyCaptureHelp(self.language))
             }
         }
 
@@ -220,29 +260,32 @@ final class SettingsPopoverViewController: NSViewController {
         hotkeyRow.alignment = .centerY
         hotkeyRow.spacing = 8
 
-        let permissionsButton = rowButton("Разрешения", symbol: "checkmark.shield", action: #selector(requestPermissions))
-        let logsButton = rowButton("Логи", symbol: "doc.text.magnifyingglass", action: #selector(openLogs))
+        configureRowButton(permissionsButton, symbol: "checkmark.shield", action: #selector(requestPermissions))
+        configureRowButton(logsButton, symbol: "doc.text.magnifyingglass", action: #selector(openLogs))
         launchAtLoginButton.target = self
         launchAtLoginButton.action = #selector(launchAtLoginChanged)
 
-        let quitButton = rowButton("Выход", symbol: "power", action: #selector(quit))
+        configureRowButton(quitButton, symbol: "power", action: #selector(quit))
 
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.maximumNumberOfLines = 2
         statusLabel.lineBreakMode = .byWordWrapping
 
-        let metadataLabel = hintLabel(AppMetadata.footerText())
+        configureHintLabel(metadataLabel)
         metadataLabel.maximumNumberOfLines = 2
         metadataLabel.lineBreakMode = .byWordWrapping
 
         let stack = NSStackView(views: [
             header,
+            languageLabel,
+            languagePopup,
+            languageHintLabel,
             tokenLabel,
             tokenRow,
             modelHeader,
             modelPopup,
-            modelHint,
+            modelHintLabel,
             hotkeyLabel,
             hotkeyRow,
             separator(),
@@ -264,6 +307,7 @@ final class SettingsPopoverViewController: NSViewController {
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 18),
+            languagePopup.widthAnchor.constraint(equalTo: stack.widthAnchor),
             tokenRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             modelHeader.widthAnchor.constraint(equalTo: stack.widthAnchor),
             modelPopup.widthAnchor.constraint(equalTo: stack.widthAnchor),
@@ -279,15 +323,23 @@ final class SettingsPopoverViewController: NSViewController {
 
     private func sectionLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
-        label.font = .systemFont(ofSize: 12, weight: .medium)
+        configureSectionLabel(label)
         return label
+    }
+
+    private func configureSectionLabel(_ label: NSTextField) {
+        label.font = .systemFont(ofSize: 12, weight: .medium)
     }
 
     private func hintLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
+        configureHintLabel(label)
+        return label
+    }
+
+    private func configureHintLabel(_ label: NSTextField) {
         label.font = .systemFont(ofSize: 11)
         label.textColor = .secondaryLabelColor
-        return label
     }
 
     private func separator() -> NSBox {
@@ -298,21 +350,56 @@ final class SettingsPopoverViewController: NSViewController {
 
     private func iconButton(_ symbol: String, action: Selector, accessibilityDescription: String) -> NSButton {
         let button = NSButton()
+        configureIconButton(button, symbol: symbol, action: action, accessibilityDescription: accessibilityDescription)
+        return button
+    }
+
+    private func configureIconButton(_ button: NSButton, symbol: String, action: Selector, accessibilityDescription: String) {
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: accessibilityDescription)
         button.imagePosition = .imageOnly
         button.bezelStyle = .rounded
         button.target = self
         button.action = action
-        return button
     }
 
     private func rowButton(_ title: String, symbol: String, action: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: action)
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
+        configureRowButton(button, symbol: symbol, action: action)
+        return button
+    }
+
+    private func configureRowButton(_ button: NSButton, symbol: String, action: Selector) {
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.title)
         button.imagePosition = .imageLeading
         button.alignment = .left
         button.bezelStyle = .rounded
-        return button
+        button.target = self
+        button.action = action
+    }
+
+    private func applyLocalization() {
+        languageLabel.stringValue = AppText.languageLabel(language)
+        languageHintLabel.stringValue = AppText.languageHint(language)
+        tokenLabel.stringValue = AppText.apiKeyLabel(language)
+        saveButton.title = AppText.save(language)
+        modelLabel.stringValue = AppText.transcriptionModel(language)
+        refreshButton.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: AppText.refreshModels(language))
+        modelHintLabel.stringValue = AppText.modelHint(language)
+        hotkeyLabel.stringValue = AppText.hotkeyLabel(language)
+        resetHotkeyButton.title = AppText.reset(language)
+        permissionsButton.title = AppText.permissions(language)
+        permissionsButton.image = NSImage(systemSymbolName: "checkmark.shield", accessibilityDescription: AppText.permissions(language))
+        logsButton.title = AppText.logs(language)
+        logsButton.image = NSImage(systemSymbolName: "doc.text.magnifyingglass", accessibilityDescription: AppText.logs(language))
+        launchAtLoginButton.title = AppText.launchAtLogin(language)
+        quitButton.title = AppText.quit(language)
+        quitButton.image = NSImage(systemSymbolName: "power", accessibilityDescription: AppText.quit(language))
+        metadataLabel.stringValue = AppMetadata.footerText(language: language)
+        hotkeyField.language = language
+
+        if let selectedModel = modelPopup.selectedItem?.representedObject as? String, !currentModels.isEmpty {
+            setModels(currentModels, selectedModel: selectedModel)
+        }
     }
 
     @objc private func saveToken() {
@@ -326,6 +413,19 @@ final class SettingsPopoverViewController: NSViewController {
     @objc private func modelChanged() {
         guard let id = modelPopup.selectedItem?.representedObject as? String else { return }
         onModelChange?(id)
+    }
+
+    @objc private func languageChanged() {
+        guard
+            let rawValue = languagePopup.selectedItem?.representedObject as? String,
+            let selectedLanguage = AppLanguage(rawValue: rawValue)
+        else {
+            return
+        }
+
+        language = selectedLanguage
+        applyLocalization()
+        onLanguageChange?(selectedLanguage)
     }
 
     @objc private func resetHotkey() {

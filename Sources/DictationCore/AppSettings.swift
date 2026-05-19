@@ -4,6 +4,7 @@ final class AppSettings {
     private enum Keys {
         static let model = "transcriptionModel"
         static let hotkey = "dictationHotkey"
+        static let language = "appLanguage"
     }
 
     private let keychain = KeychainStore(service: "dev.denis.Dictation", account: "openai-api-key")
@@ -35,6 +36,21 @@ final class AppSettings {
             if let data = try? JSONEncoder().encode(newValue) {
                 UserDefaults.standard.set(data, forKey: Keys.hotkey)
             }
+        }
+    }
+
+    var language: AppLanguage {
+        get {
+            guard
+                let rawValue = UserDefaults.standard.string(forKey: Keys.language),
+                let language = AppLanguage(rawValue: rawValue)
+            else {
+                return .defaultLanguage
+            }
+            return language
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: Keys.language)
         }
     }
 

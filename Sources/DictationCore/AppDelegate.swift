@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         dictationController.startHotkeyMonitoring()
         dictationController.discardPendingRecordings()
-        settingsViewController?.setStatus("Готово. Удерживайте \(settings.hotkey.displayName) для диктовки.")
+        settingsViewController?.setStatus(AppText.ready(hotkey: settings.hotkey.displayName, language: settings.language))
     }
 
     private func configureStatusItem() {
@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             selectedModel: settings.model,
             models: OpenAIModelService.fallbackModels,
             hotkey: settings.hotkey,
+            language: settings.language,
             launchAtLogin: LaunchAtLoginController.isEnabled
         )
 
@@ -61,7 +62,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onHotkeyChange = { [weak self] hotkey in
             self?.settings.hotkey = hotkey
             self?.logger.log(.info, "hotkey_changed", metadata: ["hotkey": hotkey.displayName])
-            self?.settingsViewController?.setStatus("Клавиша диктовки: \(hotkey.displayName).")
+            let language = self?.settings.language ?? .defaultLanguage
+            self?.settingsViewController?.setStatus(AppText.hotkeyChanged(hotkey.displayName, language: language))
+        }
+        controller.onLanguageChange = { [weak self, weak controller] language in
+            self?.settings.language = language
+            self?.configureApplicationMenu()
+            self?.settingsViewController?.setStatus(AppText.ready(hotkey: self?.settings.hotkey.displayName ?? "", language: language))
+            self?.logger.log(.info, "language_changed", metadata: ["language": language.rawValue])
+            if self?.settings.apiKey?.isEmpty == false {
+                self?.refreshModels(controller: controller, silent: true)
+            }
         }
         controller.onHotkeyRecordingStateChange = { [weak self] isRecording in
             self?.dictationController.setHotkeyCaptureActive(isRecording)
@@ -80,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 370, height: 462)
+        popover.contentSize = NSSize(width: 390, height: 545)
         popover.contentViewController = controller
         settingsViewController = controller
 
@@ -91,20 +102,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func configureApplicationMenu() {
         let mainMenu = NSMenu()
+        let language = settings.language
 
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Quit Dictation", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: AppText.quitApp(language), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
         let editMenuItem = NSMenuItem()
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        let editMenu = NSMenu(title: AppText.editMenu(language))
+        editMenu.addItem(withTitle: AppText.cut(language), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: AppText.copy(language), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: AppText.paste(language), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(NSMenuItem.separator())
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(withTitle: AppText.selectAll(language), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
@@ -114,14 +126,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func saveAndValidateToken(_ token: String, controller: SettingsPopoverViewController?) {
         let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         controller?.setValidationState(.loading)
-        controller?.setStatus("Проверяю токен...")
+        controller?.setStatus(AppText.checkingToken(settings.language))
 
         Task {
             do {
                 guard !trimmedToken.isEmpty else {
                     try settings.saveAPIKey("")
                     controller?.setValidationState(.idle)
-                    controller?.setStatus("Токен очищен.")
+                    controller?.setStatus(AppText.tokenCleared(settings.language))
                     logger.log(.info, "token_cleared")
                     return
                 }
@@ -130,11 +142,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try settings.saveAPIKey(trimmedToken)
                 controller?.setModels(models, selectedModel: settings.model)
                 controller?.setValidationState(.success)
-                controller?.setStatus("Токен принят. Модели загружены онлайн.")
+                controller?.setStatus(AppText.tokenAcceptedModelsLoaded(settings.language))
                 logger.log(.info, "token_validated", metadata: ["models": "\(models.count)"])
             } catch {
                 controller?.setValidationState(.failure)
-                controller?.setStatus("Токен не прошел проверку: \(error.localizedDescription)")
+                controller?.setStatus(AppText.tokenValidationFailed(error.localizedDescription, language: settings.language))
                 logger.log(.error, "token_validation_failed", metadata: ["message": error.localizedDescription])
             }
         }
@@ -144,13 +156,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let apiKey = settings.apiKey, !apiKey.isEmpty else {
             controller?.setModels(OpenAIModelService.fallbackModels, selectedModel: settings.model)
             if !silent {
-                controller?.setStatus("Сначала сохраните OpenAI API key.")
+                controller?.setStatus(AppText.saveTokenFirst(settings.language))
             }
             return
         }
 
         if !silent {
-            controller?.setStatus("Загружаю модели онлайн...")
+            controller?.setStatus(AppText.loadingModels(settings.language))
         }
         controller?.setModelsLoading(true)
 
@@ -165,13 +177,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     controller?.selectModel(first.id)
                 }
                 if !silent {
-                    controller?.setStatus("Модели обновлены из OpenAI.")
+                    controller?.setStatus(AppText.modelsUpdated(settings.language))
                 }
                 logger.log(.info, "models_refreshed", metadata: ["count": "\(models.count)"])
             } catch {
                 controller?.setModels(OpenAIModelService.fallbackModels, selectedModel: settings.model)
                 if !silent {
-                    controller?.setStatus("Не удалось загрузить модели: \(error.localizedDescription)")
+                    controller?.setStatus(AppText.modelsLoadFailed(error.localizedDescription, language: settings.language))
                 }
                 logger.log(.warning, "models_refresh_failed", metadata: ["message": error.localizedDescription])
             }
@@ -182,11 +194,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try LaunchAtLoginController.setEnabled(enabled)
             controller?.setLaunchAtLogin(LaunchAtLoginController.isEnabled)
-            controller?.setStatus(enabled ? "Автозапуск включен." : "Автозапуск выключен.")
+            controller?.setStatus(AppText.launchAtLoginChanged(enabled, language: settings.language))
             logger.log(.info, "launch_at_login_changed", metadata: ["enabled": "\(enabled)"])
         } catch {
             controller?.setLaunchAtLogin(LaunchAtLoginController.isEnabled)
-            controller?.setStatus("Не удалось изменить автозапуск: \(error.localizedDescription)")
+            controller?.setStatus(AppText.launchAtLoginFailed(error.localizedDescription, language: settings.language))
             logger.log(.error, "launch_at_login_failed", metadata: ["message": error.localizedDescription])
         }
     }

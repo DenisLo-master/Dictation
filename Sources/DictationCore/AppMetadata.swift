@@ -7,7 +7,7 @@ public enum AppMetadata {
         bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
     }
 
-    public static func footerText(version: String = version()) -> String {
-        "Версия: \(version)\nРазработчик: \(developerEmail)"
+    public static func footerText(version: String = version(), language: AppLanguage = .defaultLanguage) -> String {
+        AppText.footer(version: version, developerEmail: developerEmail, language: language)
     }
 }

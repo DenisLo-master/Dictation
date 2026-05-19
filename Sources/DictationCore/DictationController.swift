@@ -52,14 +52,15 @@ final class DictationController {
         AudioRecorder.requestPermission { [weak self] granted in
             Task { @MainActor in
                 let accessibility = self?.pasteInjector.requestAccessibilityPermission(openSettings: true) ?? false
+                let language = self?.settings.language ?? .defaultLanguage
                 if granted && accessibility {
-                    self?.onStatusChange?("Разрешения выданы.")
+                    self?.onStatusChange?(AppText.permissionsOk(language))
                     self?.logger.log(.info, "permissions_ok")
                 } else if granted {
-                    self?.onStatusChange?("Микрофон разрешен. Подтвердите Accessibility.")
+                    self?.onStatusChange?(AppText.microphoneOkAccessibilityNeeded(language))
                     self?.logger.log(.warning, "accessibility_permission_missing")
                 } else {
-                    self?.onStatusChange?("Нужен доступ к микрофону и Accessibility.")
+                    self?.onStatusChange?(AppText.permissionsNeeded(language))
                     self?.logger.log(.warning, "microphone_permission_missing")
                 }
             }
@@ -138,7 +139,7 @@ final class DictationController {
         guard !isBusy else { return }
 
         guard settings.apiKey?.isEmpty == false else {
-            onStatusChange?("Сначала сохраните OpenAI API key.")
+            onStatusChange?(AppText.saveTokenFirst(settings.language))
             logger.log(.warning, "recording_blocked_no_token")
             return
         }
@@ -154,7 +155,7 @@ final class DictationController {
             try recorder.start()
             isBusy = true
             overlay.showRecording()
-            onStatusChange?("Запись...")
+            onStatusChange?(AppText.recording(settings.language))
             logger.log(.info, "recording_started", metadata: [
                 "hotkey": settings.hotkey.displayName,
                 "target": insertionTargetApplication?.localizedName ?? "frontmost"
@@ -164,7 +165,7 @@ final class DictationController {
             isBusy = false
             insertionTargetApplication = nil
             overlay.hide()
-            onStatusChange?("Не удалось начать запись: \(error.localizedDescription)")
+            onStatusChange?(AppText.recordingStartFailed(error.localizedDescription, language: settings.language))
             logger.log(.error, "recording_start_failed", metadata: ["message": error.localizedDescription])
         }
     }
@@ -180,7 +181,7 @@ final class DictationController {
                 isBusy = false
                 insertionTargetApplication = nil
                 overlay.hide()
-                onStatusChange?("Слишком короткая запись удалена.")
+                onStatusChange?(AppText.recordingTooShort(settings.language))
                 logger.log(.warning, "recording_discarded_too_short", metadata: [
                     "duration": String(format: "%.3fs", result.duration)
                 ])
@@ -189,7 +190,7 @@ final class DictationController {
 
             let job = try queue.enqueue(tempFileURL: result.fileURL, duration: result.duration)
             overlay.setTranscribing()
-            onStatusChange?("Запись завершена. Распознаю...")
+            onStatusChange?(AppText.transcribing(settings.language))
             logger.log(.info, "audio_captured", metadata: [
                 "audio_id": job.id,
                 "duration": String(format: "%.1fs", job.duration),
@@ -205,7 +206,7 @@ final class DictationController {
             isBusy = false
             insertionTargetApplication = nil
             overlay.hide()
-            onStatusChange?("Не удалось сохранить запись: \(error.localizedDescription)")
+            onStatusChange?(AppText.recordingFinishFailed(error.localizedDescription, language: settings.language))
             logger.log(.error, "recording_finish_failed", metadata: ["message": error.localizedDescription])
         }
     }
@@ -220,7 +221,7 @@ final class DictationController {
             if visualFeedback {
                 overlay.hide()
             }
-            onStatusChange?("OpenAI API key не найден.")
+            onStatusChange?(AppText.apiKeyMissing(settings.language))
             logger.log(.warning, "transcription_blocked_no_token", metadata: ["audio_id": initialJob.id])
             return
         }
@@ -234,7 +235,7 @@ final class DictationController {
                 if visualFeedback {
                     overlay.flashFailureAndHide()
                 }
-                onStatusChange?("Слишком короткая запись удалена.")
+                onStatusChange?(AppText.recordingTooShort(settings.language))
                 logger.log(.warning, "pending_discarded_too_short", metadata: [
                     "audio_id": job.id,
                     "duration": String(format: "%.3fs", job.duration),
@@ -266,7 +267,8 @@ final class DictationController {
                 let text = try await transcriber.transcribe(
                     fileURL: chunk.fileURL,
                     apiKey: apiKey,
-                    model: settings.model
+                    model: settings.model,
+                    language: settings.language
                 )
                 transcriptParts.append(text)
                 logger.log(.info, "chunk_transcribed", metadata: [
@@ -286,7 +288,7 @@ final class DictationController {
                 if visualFeedback {
                     overlay.hide()
                 }
-                onStatusChange?("Пустая транскрибация.")
+                onStatusChange?(AppText.emptyTranscription(settings.language))
                 logger.log(.warning, "empty_transcription", metadata: ["audio_id": job.id])
                 return
             }
@@ -299,7 +301,7 @@ final class DictationController {
                 if visualFeedback {
                     overlay.flashSuccessAndHide()
                 }
-                onStatusChange?("Вставлено.")
+                onStatusChange?(AppText.inserted(settings.language))
                 logger.log(.info, "transcription_inserted", metadata: [
                     "audio_id": job.id,
                     "chars": "\(insertedText.count)",
@@ -311,7 +313,7 @@ final class DictationController {
                     overlay.flashFailureAndHide()
                 }
                 queue.complete(job)
-                onStatusChange?("Текст распознан, но не вставлен. Запись удалена.")
+                onStatusChange?(AppText.recognizedButNotInserted(settings.language))
                 logger.log(.error, "paste_blocked_accessibility_transcript_deleted", metadata: [
                     "audio_id": job.id,
                     "attempt": "\(job.attempts)",
@@ -326,7 +328,7 @@ final class DictationController {
                 if visualFeedback {
                     overlay.flashFailureAndHide()
                 }
-                onStatusChange?("Поврежденная запись удалена. Запишите заново.")
+                onStatusChange?(AppText.corruptedRecordingDeleted(settings.language))
                 logger.log(.error, "transcription_terminal_audio_discarded", metadata: [
                     "audio_id": job.id,
                     "attempt": "\(job.attempts)",
@@ -340,7 +342,7 @@ final class DictationController {
                 overlay.flashFailureAndHide()
             }
             queue.complete(job)
-            onStatusChange?("Ошибка. Запись удалена, попробуйте еще раз.")
+            onStatusChange?(AppText.genericErrorDeleted(settings.language))
             logger.log(.error, "transcription_failed_audio_deleted", metadata: [
                 "audio_id": job.id,
                 "attempt": "\(job.attempts)",
@@ -373,7 +375,7 @@ final class DictationController {
                 metadata["audio_id"] = audioID
             }
             logger.log(.warning, "accessibility_permission_required", metadata: metadata)
-            onStatusChange?("Разрешите Accessibility: Privacy & Security -> Accessibility -> Dictation.")
+            onStatusChange?(AppText.accessibilitySettings(settings.language))
             return false
         }
 

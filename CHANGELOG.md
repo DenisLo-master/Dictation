@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.14 - 2026-05-20
+
+- Added UI language selection for English, Russian, Spanish, Turkish, and German.
+- Localized settings, statuses, menus, model badges, and metadata footer.
+- Added left Command, left Option, and left Control support for hold-to-dictate hotkeys.
+- Updated the overlay microphone badge to a narrower selected shape.
+- Passed the selected language as an OpenAI transcription language hint.
+
 ## 0.1.13 - 2026-05-20
 
 Initial public-ready build.

@@ -19,7 +19,7 @@ struct OpenAITranscriber {
         let text: String
     }
 
-    func transcribe(fileURL: URL, apiKey: String, model: String) async throws -> String {
+    func transcribe(fileURL: URL, apiKey: String, model: String, language: AppLanguage) async throws -> String {
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/audio/transcriptions")!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -31,6 +31,7 @@ struct OpenAITranscriber {
             boundary: boundary,
             fields: [
                 "model": model,
+                "language": language.openAIParameter,
                 "response_format": "json"
             ],
             fileField: "file",

@@ -6,6 +6,12 @@ final class HotkeyRecorderField: NSControl {
     var onInvalidCapture: ((String) -> Void)?
     var onRecordingStateChange: ((Bool) -> Void)?
 
+    var language: AppLanguage = .defaultLanguage {
+        didSet {
+            needsDisplay = true
+        }
+    }
+
     var hotkey: DictationHotkey = .defaultHotkey {
         didSet {
             isRecording = false
@@ -56,7 +62,7 @@ final class HotkeyRecorderField: NSControl {
         path.lineWidth = isRecording ? 1.5 : 1
         path.stroke()
 
-        let text = isRecording ? "Нажмите клавишу..." : hotkey.displayName
+        let text = isRecording ? AppText.hotkeyCapturePlaceholder(language) : hotkey.displayName
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12, weight: .medium),
             .foregroundColor: isRecording ? NSColor.controlAccentColor : NSColor.labelColor
@@ -81,7 +87,7 @@ final class HotkeyRecorderField: NSControl {
             window?.makeFirstResponder(nil)
             onCapture?(captured)
         } else if event.type == .keyDown {
-            onInvalidCapture?(DictationHotkey.invalidReason(for: event))
+            onInvalidCapture?(DictationHotkey.invalidReason(for: event, language: language))
         }
     }
 }

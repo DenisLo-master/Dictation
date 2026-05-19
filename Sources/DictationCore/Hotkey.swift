@@ -80,11 +80,11 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
         return nil
     }
 
-    public static func invalidReason(for event: NSEvent) -> String {
+    public static func invalidReason(for event: NSEvent, language: AppLanguage = .defaultLanguage) -> String {
         if event.type == .keyDown {
-            return "Выберите Fn, правый modifier или F13-F20."
+            return AppText.invalidHotkeyKeyDown(language)
         }
-        return "Эта клавиша не подходит для удержания."
+        return AppText.invalidHotkeyHold(language)
     }
 
     private static func modifierHotkey(from event: NSEvent) -> DictationHotkey? {
@@ -95,6 +95,13 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
         }
 
         switch Int(event.keyCode) {
+        case kVK_Option where flags.contains(.option):
+            return DictationHotkey(
+                keyCode: event.keyCode,
+                modifierFlagRawValue: NSEvent.ModifierFlags.option.rawValue,
+                displayName: "Left Option",
+                kind: .modifier
+            )
         case kVK_RightOption where flags.contains(.option):
             return DictationHotkey(
                 keyCode: event.keyCode,
@@ -102,11 +109,25 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
                 displayName: "Right Option",
                 kind: .modifier
             )
+        case kVK_Control where flags.contains(.control):
+            return DictationHotkey(
+                keyCode: event.keyCode,
+                modifierFlagRawValue: NSEvent.ModifierFlags.control.rawValue,
+                displayName: "Left Control",
+                kind: .modifier
+            )
         case kVK_RightControl where flags.contains(.control):
             return DictationHotkey(
                 keyCode: event.keyCode,
                 modifierFlagRawValue: NSEvent.ModifierFlags.control.rawValue,
                 displayName: "Right Control",
+                kind: .modifier
+            )
+        case kVK_Command where flags.contains(.command):
+            return DictationHotkey(
+                keyCode: event.keyCode,
+                modifierFlagRawValue: NSEvent.ModifierFlags.command.rawValue,
+                displayName: "Left Command",
                 kind: .modifier
             )
         case kVK_RightCommand where flags.contains(.command):

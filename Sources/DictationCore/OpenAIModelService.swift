@@ -37,9 +37,9 @@ public struct OpenAIModelService: Sendable {
     }
 
     public static let fallbackModels = [
-        TranscriptionModel(id: "gpt-4o-mini-transcribe", badge: "быстро"),
-        TranscriptionModel(id: "gpt-4o-transcribe", badge: "точнее"),
-        TranscriptionModel(id: "gpt-4o-transcribe-diarize", badge: "спикеры"),
+        TranscriptionModel(id: "gpt-4o-mini-transcribe", badge: "fast"),
+        TranscriptionModel(id: "gpt-4o-transcribe", badge: "accurate"),
+        TranscriptionModel(id: "gpt-4o-transcribe-diarize", badge: "speakers"),
         TranscriptionModel(id: "whisper-1", badge: "classic")
     ]
 
@@ -100,9 +100,9 @@ public struct OpenAIModelService: Sendable {
     }
 
     private static func badge(for id: String) -> String {
-        if id.contains("mini") { return "быстро" }
-        if id.contains("diarize") { return "спикеры" }
+        if id.contains("mini") { return "fast" }
+        if id.contains("diarize") { return "speakers" }
         if id == "whisper-1" { return "classic" }
-        return "точнее"
+        return "accurate"
     }
 }

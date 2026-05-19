@@ -24,6 +24,16 @@ Dictation is a small macOS status-bar app for fast voice input. Hold a hotkey, s
 
 It is designed for people who want a lightweight local utility rather than a full writing environment.
 
+### Screenshots
+
+<p align="center">
+  <img src="docs/assets/settings-menu.png" alt="Dictation settings menu" width="420">
+</p>
+
+<p align="center">
+  <img src="docs/assets/equalizer-badge.png" alt="Active voice equalizer badge" width="420">
+</p>
+
 ### Highlights
 
 | Area | What it does |
@@ -138,6 +148,16 @@ Recommended next steps for wider distribution:
 Dictation - это маленькое macOS-приложение в панели статуса для быстрой диктовки. Удерживаете горячую клавишу, говорите, отпускаете клавишу, и распознанный текст вставляется в активное приложение.
 
 Приложение сделано как легкая локальная утилита, а не как отдельная среда для письма.
+
+### Скриншоты
+
+<p align="center">
+  <img src="docs/assets/settings-menu.png" alt="Меню настроек Dictation" width="420">
+</p>
+
+<p align="center">
+  <img src="docs/assets/equalizer-badge.png" alt="Активный бейдж с эквалайзером" width="420">
+</p>
 
 ### Возможности
 
