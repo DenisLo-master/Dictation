@@ -34,6 +34,10 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
     public func isPressed(by event: NSEvent) -> Bool {
         switch kind {
         case .modifier:
+            if modifierFlag == .function {
+                return event.type == .flagsChanged
+                    && event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.function)
+            }
             return event.type == .flagsChanged
                 && event.keyCode == keyCode
                 && event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(modifierFlag)
@@ -47,6 +51,10 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
     public func isReleased(by event: NSEvent) -> Bool {
         switch kind {
         case .modifier:
+            if modifierFlag == .function {
+                return event.type == .flagsChanged
+                    && !event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.function)
+            }
             return event.type == .flagsChanged
                 && event.keyCode == keyCode
                 && !event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(modifierFlag)
@@ -82,9 +90,11 @@ public struct DictationHotkey: Codable, Equatable, Sendable {
     private static func modifierHotkey(from event: NSEvent) -> DictationHotkey? {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        switch Int(event.keyCode) {
-        case kVK_Function where flags.contains(.function):
+        if flags.contains(.function) {
             return .defaultHotkey
+        }
+
+        switch Int(event.keyCode) {
         case kVK_RightOption where flags.contains(.option):
             return DictationHotkey(
                 keyCode: event.keyCode,

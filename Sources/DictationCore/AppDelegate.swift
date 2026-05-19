@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         try? AppPaths.prepare()
         logger.log(.info, "app_launched")
+        configureApplicationMenu()
         configureStatusItem()
         configurePopover()
         dictationController.onStatusChange = { [weak self] status in
@@ -62,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.logger.log(.info, "hotkey_changed", metadata: ["hotkey": hotkey.displayName])
             self?.settingsViewController?.setStatus("Клавиша диктовки: \(hotkey.displayName).")
         }
+        controller.onHotkeyRecordingStateChange = { [weak self] isRecording in
+            self?.dictationController.setHotkeyCaptureActive(isRecording)
+        }
         controller.onRequestPermissions = { [weak self] in
             self?.dictationController.requestPermissions()
         }
@@ -83,6 +87,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.apiKey?.isEmpty == false {
             refreshModels(controller: controller, silent: true)
         }
+    }
+
+    private func configureApplicationMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit Dictation", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func saveAndValidateToken(_ token: String, controller: SettingsPopoverViewController?) {

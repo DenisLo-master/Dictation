@@ -21,6 +21,7 @@ final class DictationController {
     private var isHotkeyDown = false
     private var isBusy = false
     private var isProcessingQueue = false
+    private var isHotkeyCaptureActive = false
 
     init(settings: AppSettings, overlay: EqualizerOverlayController, logger: AppLogger) {
         self.settings = settings
@@ -67,6 +68,13 @@ final class DictationController {
         }
     }
 
+    func setHotkeyCaptureActive(_ active: Bool) {
+        isHotkeyCaptureActive = active
+        if active {
+            isHotkeyDown = false
+        }
+    }
+
     func processPendingRecordings() {
         guard !isProcessingQueue, !isBusy else { return }
         guard settings.apiKey?.isEmpty == false else { return }
@@ -93,6 +101,8 @@ final class DictationController {
     }
 
     private func handleHotkeyEvent(_ event: NSEvent) {
+        guard !isHotkeyCaptureActive else { return }
+
         let hotkey = settings.hotkey
 
         if hotkey.isPressed(by: event), !isHotkeyDown {

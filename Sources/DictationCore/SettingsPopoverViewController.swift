@@ -17,6 +17,7 @@ final class SettingsPopoverViewController: NSViewController {
     var onOpenLogs: (() -> Void)?
     var onLaunchAtLoginChange: ((Bool) -> Void)?
     var onQuit: (() -> Void)?
+    var onHotkeyRecordingStateChange: ((Bool) -> Void)?
 
     private let savedToken: String
     private let selectedModel: String
@@ -24,7 +25,7 @@ final class SettingsPopoverViewController: NSViewController {
     private let initialHotkey: DictationHotkey
     private let initialLaunchAtLogin: Bool
 
-    private let tokenField = NSSecureTextField()
+    private let tokenField = PasteFriendlySecureTextField()
     private let validationImage = NSImageView()
     private let validationSpinner = NSProgressIndicator()
     private let saveButton = NSButton()
@@ -206,6 +207,12 @@ final class SettingsPopoverViewController: NSViewController {
         }
         hotkeyField.onInvalidCapture = { [weak self] reason in
             self?.setStatus(reason)
+        }
+        hotkeyField.onRecordingStateChange = { [weak self] isRecording in
+            self?.onHotkeyRecordingStateChange?(isRecording)
+            if isRecording {
+                self?.setStatus("Нажмите Fn, Right Option, Right Control, Right Command или F13-F20.")
+            }
         }
 
         let hotkeyRow = NSStackView(views: [hotkeyField, resetHotkeyButton])

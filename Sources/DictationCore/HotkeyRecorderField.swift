@@ -4,6 +4,7 @@ import AppKit
 final class HotkeyRecorderField: NSControl {
     var onCapture: ((DictationHotkey) -> Void)?
     var onInvalidCapture: ((String) -> Void)?
+    var onRecordingStateChange: ((Bool) -> Void)?
 
     var hotkey: DictationHotkey = .defaultHotkey {
         didSet {
@@ -13,7 +14,12 @@ final class HotkeyRecorderField: NSControl {
     }
 
     private var isRecording = false {
-        didSet { needsDisplay = true }
+        didSet {
+            if oldValue != isRecording {
+                onRecordingStateChange?(isRecording)
+            }
+            needsDisplay = true
+        }
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -67,7 +73,6 @@ final class HotkeyRecorderField: NSControl {
 
     private func capture(_ event: NSEvent) {
         guard isRecording else {
-            super.keyDown(with: event)
             return
         }
 

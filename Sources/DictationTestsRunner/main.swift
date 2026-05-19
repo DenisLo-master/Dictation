@@ -61,11 +61,18 @@ enum DictationTestsRunner {
 
 func testFnHotkey() async throws {
     let fnDown = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_Function), flags: [.function])
+    let fnDownWithoutFunctionKeyCode = try makeEvent(type: .flagsChanged, keyCode: 0, flags: [.function])
     let fnUp = try makeEvent(type: .flagsChanged, keyCode: UInt16(kVK_Function), flags: [])
 
     let captured = try require(DictationHotkey.capture(from: fnDown), "Expected Fn hotkey capture")
+    let capturedWithoutFunctionKeyCode = try require(
+        DictationHotkey.capture(from: fnDownWithoutFunctionKeyCode),
+        "Expected Fn hotkey capture even when macOS does not report kVK_Function"
+    )
     try expect(captured == .defaultHotkey, "Fn capture should equal default hotkey")
+    try expect(capturedWithoutFunctionKeyCode == .defaultHotkey, "Fn capture should be based on .function flag")
     try expect(captured.isPressed(by: fnDown), "Fn down event should be pressed")
+    try expect(captured.isPressed(by: fnDownWithoutFunctionKeyCode), "Fn should trigger even with a non-Fn keyCode")
     try expect(captured.isReleased(by: fnUp), "Fn up event should be released")
 }
 
