@@ -8,13 +8,13 @@ if [ -z "${DICTATION_BUILD_DIR:-}" ] && [ -e "$DEFAULT_BUILD_DIR/Dictation.app" 
   BUILD_DIR="$DEFAULT_BUILD_DIR/current"
 fi
 APP_DIR="$BUILD_DIR/Dictation.app"
-PKG_ROOT="$BUILD_DIR/pkg-root"
-PKG_SCRIPTS="$BUILD_DIR/pkg-scripts"
+PKG_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dictation-pkg-root.XXXXXX")"
+PKG_SCRIPTS="$(mktemp -d "${TMPDIR:-/tmp}/dictation-pkg-scripts.XXXXXX")"
 PKG_PATH="$BUILD_DIR/Dictation.pkg"
 
 DICTATION_BUILD_DIR="$BUILD_DIR" "$ROOT_DIR/Scripts/build-app.sh"
 
-rm -rf "$PKG_ROOT" "$PKG_SCRIPTS" "$PKG_PATH"
+rm -f "$PKG_PATH"
 mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
 
 COPYFILE_DISABLE=1 COPY_EXTENDED_ATTRIBUTES_DISABLE=1 /usr/bin/ditto --norsrc --noextattr "$APP_DIR" "$PKG_ROOT/Applications/Dictation.app"
@@ -79,3 +79,7 @@ COPYFILE_DISABLE=1 COPY_EXTENDED_ATTRIBUTES_DISABLE=1 pkgbuild \
   "$PKG_PATH"
 
 echo "Built $PKG_PATH"
+
+if [ "${DICTATION_KEEP_BUILD_APPS:-0}" != "1" ]; then
+  rm -rf "$PKG_ROOT" "$PKG_SCRIPTS" "$APP_DIR" "$BUILD_DIR/AppIcon.iconset" 2>/dev/null || true
+fi
