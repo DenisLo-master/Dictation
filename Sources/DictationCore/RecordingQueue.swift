@@ -10,7 +10,6 @@ public struct RecordingJob: Codable, Equatable, Sendable {
     public var byteSize: Int64
     public var sha256: String
     public var attempts: Int
-    public var transcript: String?
 
     public init(
         id: String,
@@ -19,8 +18,7 @@ public struct RecordingJob: Codable, Equatable, Sendable {
         duration: TimeInterval,
         byteSize: Int64,
         sha256: String,
-        attempts: Int,
-        transcript: String? = nil
+        attempts: Int
     ) {
         self.id = id
         self.filePath = filePath
@@ -29,7 +27,6 @@ public struct RecordingJob: Codable, Equatable, Sendable {
         self.byteSize = byteSize
         self.sha256 = sha256
         self.attempts = attempts
-        self.transcript = transcript
     }
 
     public var fileURL: URL {
@@ -105,13 +102,6 @@ public final class RecordingQueue {
     public func markAttempt(_ job: RecordingJob) throws -> RecordingJob {
         var updated = job
         updated.attempts += 1
-        try save(updated)
-        return updated
-    }
-
-    public func saveTranscript(_ transcript: String, for job: RecordingJob) throws -> RecordingJob {
-        var updated = job
-        updated.transcript = transcript
         try save(updated)
         return updated
     }

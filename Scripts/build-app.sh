@@ -2,14 +2,20 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT_DIR/build/Dictation.app"
-ICONSET_DIR="$ROOT_DIR/build/AppIcon.iconset"
+DEFAULT_BUILD_DIR="$ROOT_DIR/build"
+BUILD_DIR="${DICTATION_BUILD_DIR:-$DEFAULT_BUILD_DIR}"
+if [ -z "${DICTATION_BUILD_DIR:-}" ] && [ -e "$DEFAULT_BUILD_DIR/Dictation.app" ] && [ ! -w "$DEFAULT_BUILD_DIR/Dictation.app" ]; then
+  BUILD_DIR="$DEFAULT_BUILD_DIR/current"
+fi
+APP_DIR="$BUILD_DIR/Dictation.app"
+ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
 
 cd "$ROOT_DIR"
 
 swift build -c release --product Dictation
 BIN_DIR="$(swift build -c release --show-bin-path)"
 
+mkdir -p "$BUILD_DIR"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 

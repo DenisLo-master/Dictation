@@ -2,13 +2,17 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="$ROOT_DIR/build"
+DEFAULT_BUILD_DIR="$ROOT_DIR/build"
+BUILD_DIR="${DICTATION_BUILD_DIR:-$DEFAULT_BUILD_DIR}"
+if [ -z "${DICTATION_BUILD_DIR:-}" ] && [ -e "$DEFAULT_BUILD_DIR/Dictation.app" ] && [ ! -w "$DEFAULT_BUILD_DIR/Dictation.app" ]; then
+  BUILD_DIR="$DEFAULT_BUILD_DIR/current"
+fi
 APP_DIR="$BUILD_DIR/Dictation.app"
 PKG_ROOT="$BUILD_DIR/pkg-root"
 PKG_SCRIPTS="$BUILD_DIR/pkg-scripts"
 PKG_PATH="$BUILD_DIR/Dictation.pkg"
 
-"$ROOT_DIR/Scripts/build-app.sh"
+DICTATION_BUILD_DIR="$BUILD_DIR" "$ROOT_DIR/Scripts/build-app.sh"
 
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS" "$PKG_PATH"
 mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
@@ -71,7 +75,7 @@ COPYFILE_DISABLE=1 COPY_EXTENDED_ATTRIBUTES_DISABLE=1 pkgbuild \
   --scripts "$PKG_SCRIPTS" \
   --install-location "/" \
   --identifier "dev.denis.Dictation.pkg" \
-  --version "0.1.9" \
+  --version "0.1.10" \
   "$PKG_PATH"
 
 echo "Built $PKG_PATH"

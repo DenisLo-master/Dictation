@@ -32,9 +32,7 @@ enum DictationTestsRunner {
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
             TestCase(name: "audio level meter maps voice volume without fake movement", run: testAudioLevelMeter),
-            TestCase(name: "focused input policy accepts only writable text roles", run: testFocusedInputPolicy),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
-            TestCase(name: "recording queue persists transcript for paste retry", run: testRecordingQueueTranscriptPersistence),
             TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger),
             TestCase(name: "single-instance policy ignores current and terminated apps", run: testSingleInstancePolicy),
             TestCase(name: "app metadata footer contains version and developer", run: testAppMetadataFooter)
@@ -168,29 +166,6 @@ func testAudioLevelMeter() async throws {
     try expect(afterLoud.last ?? 0 > afterSilence.last ?? 0, "New voice level should drive the newest column")
 }
 
-func testFocusedInputPolicy() async throws {
-    try expect(
-        FocusedTextInputPolicy.isWritable(role: "AXTextArea", subrole: nil),
-        "Text areas should accept paste"
-    )
-    try expect(
-        FocusedTextInputPolicy.isWritable(role: "AXTextField", subrole: nil),
-        "Text fields should accept paste"
-    )
-    try expect(
-        FocusedTextInputPolicy.isWritable(role: "AXGroup", subrole: "AXSecureTextField"),
-        "Secure text subroles should accept paste"
-    )
-    try expect(
-        !FocusedTextInputPolicy.isWritable(role: "AXButton", subrole: nil),
-        "Buttons should not accept delayed paste"
-    )
-    try expect(
-        !FocusedTextInputPolicy.isWritable(role: nil, subrole: nil),
-        "Missing focused role should not accept delayed paste"
-    )
-}
-
 func testRecordingQueue() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("DictationQueueTests-\(UUID().uuidString)", isDirectory: true)
@@ -224,30 +199,6 @@ func testRecordingQueue() async throws {
         queue.complete(attempted)
         try expect(queue.loadPending().isEmpty, "Completed job should be removed from queue")
         try expect(!FileManager.default.fileExists(atPath: attempted.filePath), "Completed audio file should be deleted")
-    }
-}
-
-func testRecordingQueueTranscriptPersistence() async throws {
-    let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent("DictationQueueTranscriptTests-\(UUID().uuidString)", isDirectory: true)
-    let pending = root.appendingPathComponent("Pending", isDirectory: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let tempAudio = root.appendingPathComponent("sample.m4a")
-    try Data("audio payload".utf8).write(to: tempAudio)
-
-    try await MainActor.run {
-        let queue = RecordingQueue(pendingDirectory: pending)
-        let job = try queue.enqueue(tempFileURL: tempAudio, duration: 2.0)
-        let saved = try queue.saveTranscript("готовый текст", for: job)
-
-        try expect(saved.transcript == "готовый текст", "Saved job should return the transcript")
-        let loaded = try require(queue.loadPending().first, "Expected pending job to reload")
-        try expect(loaded.transcript == "готовый текст", "Transcript should persist across queue reloads")
-
-        queue.complete(loaded)
-        try expect(queue.loadPending().isEmpty, "Completed transcript job should be removed from queue")
     }
 }
 

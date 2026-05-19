@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsViewController?.setStatus(status)
         }
         dictationController.startHotkeyMonitoring()
-        dictationController.processPendingRecordings()
+        dictationController.discardPendingRecordings()
         settingsViewController?.setStatus("Готово. Удерживайте \(settings.hotkey.displayName) для диктовки.")
     }
 
