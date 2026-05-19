@@ -2,29 +2,36 @@ import AppKit
 import Carbon
 import Foundation
 
-struct DictationHotkey: Codable, Equatable {
-    enum Kind: String, Codable {
+public struct DictationHotkey: Codable, Equatable, Sendable {
+    public enum Kind: String, Codable, Sendable {
         case modifier
         case functionKey
     }
 
-    var keyCode: UInt16
-    var modifierFlagRawValue: UInt
-    var displayName: String
-    var kind: Kind
+    public var keyCode: UInt16
+    public var modifierFlagRawValue: UInt
+    public var displayName: String
+    public var kind: Kind
 
-    static let defaultHotkey = DictationHotkey(
+    public init(keyCode: UInt16, modifierFlagRawValue: UInt, displayName: String, kind: Kind) {
+        self.keyCode = keyCode
+        self.modifierFlagRawValue = modifierFlagRawValue
+        self.displayName = displayName
+        self.kind = kind
+    }
+
+    public static let defaultHotkey = DictationHotkey(
         keyCode: UInt16(kVK_Function),
         modifierFlagRawValue: NSEvent.ModifierFlags.function.rawValue,
         displayName: "Fn / Globe",
         kind: .modifier
     )
 
-    var modifierFlag: NSEvent.ModifierFlags {
+    public var modifierFlag: NSEvent.ModifierFlags {
         NSEvent.ModifierFlags(rawValue: modifierFlagRawValue)
     }
 
-    func isPressed(by event: NSEvent) -> Bool {
+    public func isPressed(by event: NSEvent) -> Bool {
         switch kind {
         case .modifier:
             return event.type == .flagsChanged
@@ -37,7 +44,7 @@ struct DictationHotkey: Codable, Equatable {
         }
     }
 
-    func isReleased(by event: NSEvent) -> Bool {
+    public func isReleased(by event: NSEvent) -> Bool {
         switch kind {
         case .modifier:
             return event.type == .flagsChanged
@@ -48,7 +55,7 @@ struct DictationHotkey: Codable, Equatable {
         }
     }
 
-    static func capture(from event: NSEvent) -> DictationHotkey? {
+    public static func capture(from event: NSEvent) -> DictationHotkey? {
         if event.type == .flagsChanged {
             return modifierHotkey(from: event)
         }
@@ -65,7 +72,7 @@ struct DictationHotkey: Codable, Equatable {
         return nil
     }
 
-    static func invalidReason(for event: NSEvent) -> String {
+    public static func invalidReason(for event: NSEvent) -> String {
         if event.type == .keyDown {
             return "Выберите Fn, правый modifier или F13-F20."
         }

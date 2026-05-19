@@ -92,8 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             do {
-                try settings.saveAPIKey(trimmedToken)
                 guard !trimmedToken.isEmpty else {
+                    try settings.saveAPIKey("")
                     controller?.setValidationState(.idle)
                     controller?.setStatus("Токен очищен.")
                     logger.log(.info, "token_cleared")
@@ -101,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
 
                 let models = try await modelService.fetchTranscriptionModels(apiKey: trimmedToken)
+                try settings.saveAPIKey(trimmedToken)
                 controller?.setModels(models, selectedModel: settings.model)
                 controller?.setValidationState(.success)
                 controller?.setStatus("Токен принят. Модели загружены онлайн.")

@@ -11,8 +11,8 @@ let package = Package(
         .executable(name: "Dictation", targets: ["DictationApp"])
     ],
     targets: [
-        .executableTarget(
-            name: "DictationApp",
+        .target(
+            name: "DictationCore",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("ApplicationServices"),
@@ -21,6 +21,14 @@ let package = Package(
                 .linkedFramework("Security"),
                 .linkedFramework("ServiceManagement")
             ]
+        ),
+        .executableTarget(
+            name: "DictationApp",
+            dependencies: ["DictationCore"]
+        ),
+        .executableTarget(
+            name: "DictationTestsRunner",
+            dependencies: ["DictationCore"]
         )
     ]
 )

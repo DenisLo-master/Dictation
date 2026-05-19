@@ -1,17 +1,22 @@
 import Foundation
 
-struct TranscriptionModel: Equatable {
-    let id: String
-    let badge: String
+public struct TranscriptionModel: Equatable, Sendable {
+    public let id: String
+    public let badge: String
+
+    public init(id: String, badge: String) {
+        self.id = id
+        self.badge = badge
+    }
 }
 
-struct OpenAIModelService {
-    enum ServiceError: LocalizedError {
+public struct OpenAIModelService: Sendable {
+    public enum ServiceError: LocalizedError {
         case invalidResponse
         case serverError(Int, String)
         case noTranscriptionModels
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .invalidResponse:
                 "OpenAI returned an invalid response."
@@ -31,14 +36,16 @@ struct OpenAIModelService {
         let id: String
     }
 
-    static let fallbackModels = [
+    public static let fallbackModels = [
         TranscriptionModel(id: "gpt-4o-mini-transcribe", badge: "быстро"),
         TranscriptionModel(id: "gpt-4o-transcribe", badge: "точнее"),
         TranscriptionModel(id: "gpt-4o-transcribe-diarize", badge: "спикеры"),
         TranscriptionModel(id: "whisper-1", badge: "classic")
     ]
 
-    func fetchTranscriptionModels(apiKey: String) async throws -> [TranscriptionModel] {
+    public init() {}
+
+    public func fetchTranscriptionModels(apiKey: String) async throws -> [TranscriptionModel] {
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -55,20 +62,25 @@ struct OpenAIModelService {
         }
 
         let decoded = try JSONDecoder().decode(ModelsResponse.self, from: data)
-        let models = decoded.data
-            .map(\.id)
-            .filter(Self.isTranscriptionModel)
-            .sorted()
-            .map { TranscriptionModel(id: $0, badge: Self.badge(for: $0)) }
+        let models = Self.transcriptionModels(from: decoded.data.map(\.id))
 
         guard !models.isEmpty else {
             throw ServiceError.noTranscriptionModels
         }
 
-        return prioritize(models)
+        return models
     }
 
-    private func prioritize(_ models: [TranscriptionModel]) -> [TranscriptionModel] {
+    public static func transcriptionModels(from ids: [String]) -> [TranscriptionModel] {
+        prioritize(
+            ids
+                .filter(Self.isTranscriptionModel)
+                .sorted()
+                .map { TranscriptionModel(id: $0, badge: Self.badge(for: $0)) }
+        )
+    }
+
+    private static func prioritize(_ models: [TranscriptionModel]) -> [TranscriptionModel] {
         let preferred = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-4o-transcribe-diarize", "whisper-1"]
         return models.sorted { left, right in
             let leftIndex = preferred.firstIndex(of: left.id) ?? Int.max

@@ -1,16 +1,59 @@
 import AVFoundation
 import Foundation
 
-struct AudioChunk {
-    var index: Int
-    var start: TimeInterval
-    var end: TimeInterval
-    var fileURL: URL
+public struct AudioChunk: Sendable {
+    public var index: Int
+    public var start: TimeInterval
+    public var end: TimeInterval
+    public var fileURL: URL
+
+    public init(index: Int, start: TimeInterval, end: TimeInterval, fileURL: URL) {
+        self.index = index
+        self.start = start
+        self.end = end
+        self.fileURL = fileURL
+    }
 }
 
-struct AudioChunker {
+public struct AudioChunkPlan: Equatable, Sendable {
+    public var index: Int
+    public var start: TimeInterval
+    public var end: TimeInterval
+
+    public init(index: Int, start: TimeInterval, end: TimeInterval) {
+        self.index = index
+        self.start = start
+        self.end = end
+    }
+}
+
+public struct AudioChunker: Sendable {
     private let maxChunkBytes: Int64 = 24 * 1024 * 1024
     private let overlapSeconds: TimeInterval = 1.0
+
+    public init() {}
+
+    public static func plan(
+        duration: TimeInterval,
+        byteSize: Int64,
+        maxChunkBytes: Int64 = 24 * 1024 * 1024,
+        overlapSeconds: TimeInterval = 1.0
+    ) -> [AudioChunkPlan] {
+        guard byteSize > maxChunkBytes else {
+            return [AudioChunkPlan(index: 0, start: 0, end: duration)]
+        }
+
+        let chunkCount = max(2, Int(ceil(Double(byteSize) / Double(maxChunkBytes))))
+        let baseDuration = max(10, duration / Double(chunkCount))
+
+        return (0..<chunkCount).map { index in
+            AudioChunkPlan(
+                index: index,
+                start: max(0, Double(index) * baseDuration - (index == 0 ? 0 : overlapSeconds)),
+                end: min(duration, Double(index + 1) * baseDuration + overlapSeconds)
+            )
+        }
+    }
 
     func chunks(for job: RecordingJob) async throws -> [AudioChunk] {
         guard job.byteSize > maxChunkBytes else {
@@ -20,20 +63,16 @@ struct AudioChunker {
         }
 
         try AppPaths.prepare()
-        let chunkCount = max(2, Int(ceil(Double(job.byteSize) / Double(maxChunkBytes))))
-        let baseDuration = max(10, job.duration / Double(chunkCount))
         var chunks: [AudioChunk] = []
 
-        for index in 0..<chunkCount {
-            let start = max(0, Double(index) * baseDuration - (index == 0 ? 0 : overlapSeconds))
-            let end = min(job.duration, Double(index + 1) * baseDuration + overlapSeconds)
+        for plan in Self.plan(duration: job.duration, byteSize: job.byteSize, maxChunkBytes: maxChunkBytes, overlapSeconds: overlapSeconds) {
             let outputURL = AppPaths.chunksDirectory
-                .appendingPathComponent("\(job.id)-chunk-\(index)")
+                .appendingPathComponent("\(job.id)-chunk-\(plan.index)")
                 .appendingPathExtension("m4a")
 
             try? FileManager.default.removeItem(at: outputURL)
-            try await exportChunk(inputURL: job.fileURL, outputURL: outputURL, start: start, end: end)
-            chunks.append(AudioChunk(index: index, start: start, end: end, fileURL: outputURL))
+            try await exportChunk(inputURL: job.fileURL, outputURL: outputURL, start: plan.start, end: plan.end)
+            chunks.append(AudioChunk(index: plan.index, start: plan.start, end: plan.end, fileURL: outputURL))
         }
 
         return chunks
@@ -74,8 +113,8 @@ struct AudioChunker {
     }
 }
 
-enum TranscriptCombiner {
-    static func combine(_ parts: [String]) -> String {
+public enum TranscriptCombiner {
+    public static func combine(_ parts: [String]) -> String {
         parts.reduce("") { combined, next in
             merge(combined, next)
         }

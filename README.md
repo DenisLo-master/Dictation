@@ -29,6 +29,16 @@ Scripts/build-dmg.sh
 open build/Dictation.dmg
 ```
 
+## Test
+
+This repository uses a lightweight Swift test runner so tests work with the installed Command Line Tools environment:
+
+```sh
+swift run DictationTestsRunner
+```
+
+The runner covers hotkey capture, model filtering, transcript merging, chunk planning, reliable audio queue persistence, and log rotation.
+
 ## Install
 
 Open `build/Dictation.dmg`, then drag `Dictation.app` into `Applications`.

@@ -20,18 +20,16 @@ final class AppLogger {
     func log(_ level: Level, _ event: String, metadata: [String: String] = [:]) {
         do {
             try AppPaths.prepare()
-            var line = "\(formatter.string(from: Date())) [\(level.rawValue)] \(event)"
-            if !metadata.isEmpty {
-                let suffix = metadata
-                    .sorted { $0.key < $1.key }
-                    .map { "\($0.key)=\($0.value.quotedForLog)" }
-                    .joined(separator: " ")
-                line += " \(suffix)"
-            }
+            let line = RollingLogStore.formatLine(
+                date: Date(),
+                level: level.rawValue,
+                event: event,
+                metadata: metadata,
+                formatter: formatter
+            )
 
             var lines = existingLines()
-            lines.append(line)
-            lines = Array(lines.suffix(maxLines))
+            lines = RollingLogStore.append(line, to: lines, maxLines: maxLines)
             try lines.joined(separator: "\n").appending("\n").write(
                 to: fileURL,
                 atomically: true,
@@ -68,7 +66,31 @@ final class AppLogger {
     }
 }
 
-private extension String {
+public enum RollingLogStore {
+    public static func append(_ line: String, to existingLines: [String], maxLines: Int) -> [String] {
+        Array((existingLines + [line]).suffix(max(0, maxLines)))
+    }
+
+    public static func formatLine(
+        date: Date,
+        level: String,
+        event: String,
+        metadata: [String: String],
+        formatter: DateFormatter
+    ) -> String {
+        var line = "\(formatter.string(from: date)) [\(level)] \(event)"
+        if !metadata.isEmpty {
+            let suffix = metadata
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value.quotedForLog)" }
+                .joined(separator: " ")
+            line += " \(suffix)"
+        }
+        return line
+    }
+}
+
+extension String {
     var quotedForLog: String {
         if rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
             return self
