@@ -6,13 +6,12 @@ BUILD_DIR="$ROOT_DIR/build"
 DMG_ROOT="$BUILD_DIR/dmg-root"
 DMG_PATH="$BUILD_DIR/Dictation.dmg"
 
-"$ROOT_DIR/Scripts/build-app.sh"
+"$ROOT_DIR/Scripts/build-pkg.sh"
 
 rm -rf "$DMG_ROOT" "$DMG_PATH"
 mkdir -p "$DMG_ROOT"
 
-cp -R "$BUILD_DIR/Dictation.app" "$DMG_ROOT/Dictation.app"
-ln -s /Applications "$DMG_ROOT/Applications"
+cp "$BUILD_DIR/Dictation.pkg" "$DMG_ROOT/Install Dictation.pkg"
 
 hdiutil create \
   -volname "Dictation" \

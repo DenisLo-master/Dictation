@@ -22,14 +22,30 @@ let specs: [(String, CGFloat)] = [
 ]
 
 for (name, size) in specs {
-    let image = NSImage(size: NSSize(width: size, height: size))
-    image.lockFocus()
+    guard let bitmap = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: Int(size),
+        pixelsHigh: Int(size),
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ) else {
+        fatalError("Could not create bitmap for \(name)")
+    }
+
+    bitmap.size = NSSize(width: size, height: size)
+
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
     drawIcon(size: size)
-    image.unlockFocus()
+    NSGraphicsContext.current?.flushGraphics()
+    NSGraphicsContext.restoreGraphicsState()
 
     guard
-        let tiff = image.tiffRepresentation,
-        let bitmap = NSBitmapImageRep(data: tiff),
         let data = bitmap.representation(using: .png, properties: [:])
     else {
         fatalError("Could not render icon \(name)")
@@ -43,46 +59,69 @@ func drawIcon(size: CGFloat) {
     NSColor.clear.setFill()
     rect.fill()
 
-    let bg = NSBezierPath(roundedRect: rect.insetBy(dx: size * 0.08, dy: size * 0.08), xRadius: size * 0.22, yRadius: size * 0.22)
+    let bgRect = rect.insetBy(dx: size * 0.075, dy: size * 0.075)
+    let bg = NSBezierPath(roundedRect: bgRect, xRadius: size * 0.235, yRadius: size * 0.235)
     let gradient = NSGradient(colors: [
-        NSColor(calibratedRed: 0.07, green: 0.74, blue: 0.78, alpha: 1),
-        NSColor(calibratedRed: 0.12, green: 0.24, blue: 0.78, alpha: 1)
+        NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.14, alpha: 1),
+        NSColor(calibratedRed: 0.01, green: 0.02, blue: 0.04, alpha: 1)
     ])
-    gradient?.draw(in: bg, angle: 225)
+    gradient?.draw(in: bg, angle: 230)
 
-    NSColor.white.withAlphaComponent(0.2).setStroke()
+    NSColor(calibratedWhite: 1, alpha: 0.16).setStroke()
     bg.lineWidth = max(1, size * 0.012)
     bg.stroke()
 
-    let laptop = NSRect(x: size * 0.18, y: size * 0.2, width: size * 0.64, height: size * 0.4)
-    let screen = NSBezierPath(roundedRect: laptop, xRadius: size * 0.045, yRadius: size * 0.045)
-    NSColor.white.withAlphaComponent(0.92).setStroke()
-    screen.lineWidth = size * 0.055
+    let shine = NSBezierPath(roundedRect: bgRect.insetBy(dx: size * 0.05, dy: size * 0.055), xRadius: size * 0.18, yRadius: size * 0.18)
+    NSColor.white.withAlphaComponent(0.055).setFill()
+    shine.fill()
+
+    let micColor = NSColor(calibratedRed: 0.36, green: 0.96, blue: 0.94, alpha: 1)
+    let laptopColor = NSColor(calibratedWhite: 0.94, alpha: 0.88)
+
+    let laptopScreen = NSRect(x: size * 0.27, y: size * 0.18, width: size * 0.46, height: size * 0.26)
+    let screen = NSBezierPath(roundedRect: laptopScreen, xRadius: size * 0.045, yRadius: size * 0.045)
+    laptopColor.withAlphaComponent(0.30).setFill()
+    screen.fill()
+    laptopColor.withAlphaComponent(0.62).setStroke()
+    screen.lineWidth = max(1.2, size * 0.025)
     screen.stroke()
 
-    let base = NSBezierPath(roundedRect: NSRect(x: size * 0.14, y: size * 0.14, width: size * 0.72, height: size * 0.075), xRadius: size * 0.035, yRadius: size * 0.035)
-    NSColor.white.withAlphaComponent(0.92).setFill()
+    let base = NSBezierPath(roundedRect: NSRect(x: size * 0.2, y: size * 0.12, width: size * 0.6, height: size * 0.075), xRadius: size * 0.036, yRadius: size * 0.036)
+    laptopColor.setFill()
     base.fill()
 
-    let micRect = NSRect(x: size * 0.41, y: size * 0.38, width: size * 0.18, height: size * 0.33)
-    let capsule = NSBezierPath(roundedRect: micRect, xRadius: size * 0.09, yRadius: size * 0.09)
-    NSColor.white.setFill()
+    let micRect = NSRect(x: size * 0.39, y: size * 0.42, width: size * 0.22, height: size * 0.33)
+    let capsule = NSBezierPath(roundedRect: micRect, xRadius: size * 0.11, yRadius: size * 0.11)
+    micColor.setFill()
     capsule.fill()
+
+    NSColor.black.withAlphaComponent(0.22).setFill()
+    NSBezierPath(roundedRect: micRect.insetBy(dx: size * 0.045, dy: size * 0.055), xRadius: size * 0.04, yRadius: size * 0.04).fill()
 
     let arc = NSBezierPath()
     arc.appendArc(
         withCenter: NSPoint(x: size * 0.5, y: size * 0.43),
-        radius: size * 0.17,
+        radius: size * 0.19,
         startAngle: 205,
         endAngle: 335,
         clockwise: false
     )
-    arc.lineWidth = size * 0.045
+    micColor.setStroke()
+    arc.lineWidth = size * 0.048
     arc.stroke()
 
     let stem = NSBezierPath()
-    stem.move(to: NSPoint(x: size * 0.5, y: size * 0.24))
-    stem.line(to: NSPoint(x: size * 0.5, y: size * 0.34))
-    stem.lineWidth = size * 0.045
+    stem.move(to: NSPoint(x: size * 0.5, y: size * 0.28))
+    stem.line(to: NSPoint(x: size * 0.5, y: size * 0.38))
+    stem.lineWidth = size * 0.048
     stem.stroke()
+
+    for index in 0..<4 {
+        let height = size * CGFloat([0.10, 0.16, 0.13, 0.2][index])
+        let x = size * (0.66 + CGFloat(index) * 0.055)
+        let y = size * 0.49
+        let cell = NSBezierPath(roundedRect: NSRect(x: x, y: y, width: size * 0.028, height: height), xRadius: size * 0.012, yRadius: size * 0.012)
+        micColor.withAlphaComponent(0.72).setFill()
+        cell.fill()
+    }
 }

@@ -32,7 +32,8 @@ enum DictationTestsRunner {
             TestCase(name: "transcript combiner removes overlap without dropping words", run: testTranscriptCombiner),
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
-            TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger)
+            TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger),
+            TestCase(name: "single-instance policy ignores current and terminated apps", run: testSingleInstancePolicy)
         ]
 
         var failures: [(String, Error)] = []
@@ -196,6 +197,28 @@ func testRollingLogger() async throws {
         line == "1970-01-01 00:00:00 [error] transcription_failed audio_id=A1 message=\"Bad gateway\"",
         "Logger should sort metadata keys and quote values with spaces"
     )
+}
+
+func testSingleInstancePolicy() async throws {
+    let apps = [
+        RunningApplicationInfo(processIdentifier: 100, bundleIdentifier: "dev.denis.Dictation", isTerminated: false),
+        RunningApplicationInfo(processIdentifier: 101, bundleIdentifier: "dev.denis.Dictation", isTerminated: true),
+        RunningApplicationInfo(processIdentifier: 102, bundleIdentifier: "com.example.Other", isTerminated: false)
+    ]
+
+    let duplicate = SingleInstancePolicy.existingInstance(
+        currentProcessIdentifier: 99,
+        bundleIdentifier: "dev.denis.Dictation",
+        runningApplications: apps
+    )
+    try expect(duplicate?.processIdentifier == 100, "Should return an existing live app with the same bundle id")
+
+    let none = SingleInstancePolicy.existingInstance(
+        currentProcessIdentifier: 100,
+        bundleIdentifier: "dev.denis.Dictation",
+        runningApplications: apps
+    )
+    try expect(none == nil, "Should ignore the current process and terminated apps")
 }
 
 func makeEvent(

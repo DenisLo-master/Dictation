@@ -29,6 +29,8 @@ Scripts/build-dmg.sh
 open build/Dictation.dmg
 ```
 
+The DMG contains `Install Dictation.pkg`. The package installer is idempotent: it quits a running Dictation instance, removes previous `Dictation.app` duplicates in `/Applications`, installs one fresh `/Applications/Dictation.app`, and launches it.
+
 ## Test
 
 This repository uses a lightweight Swift test runner so tests work with the installed Command Line Tools environment:

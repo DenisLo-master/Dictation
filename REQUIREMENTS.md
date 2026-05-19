@@ -24,7 +24,9 @@
 - Launch-at-login toggle.
 - Generated laptop + microphone `.icns` app icon.
 - `.app` bundle build script.
-- Drag-to-Applications `.dmg` build script.
+- Idempotent `.pkg` installer that replaces duplicate `/Applications/Dictation*.app` copies.
+- `.dmg` build script that packages the installer.
+- Single-instance runtime guard; launching the app twice activates the existing instance and exits the duplicate.
 - Unit-style Swift test runner.
 
 ## Manual Verification Required
