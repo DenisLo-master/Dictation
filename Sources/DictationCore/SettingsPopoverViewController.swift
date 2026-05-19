@@ -55,7 +55,7 @@ final class SettingsPopoverViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 370, height: 430))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 370, height: 462))
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
     }
@@ -225,6 +225,10 @@ final class SettingsPopoverViewController: NSViewController {
         statusLabel.maximumNumberOfLines = 2
         statusLabel.lineBreakMode = .byWordWrapping
 
+        let metadataLabel = hintLabel(AppMetadata.footerText())
+        metadataLabel.maximumNumberOfLines = 2
+        metadataLabel.lineBreakMode = .byWordWrapping
+
         let stack = NSStackView(views: [
             header,
             tokenLabel,
@@ -239,7 +243,9 @@ final class SettingsPopoverViewController: NSViewController {
             logsButton,
             launchAtLoginButton,
             quitButton,
-            statusLabel
+            statusLabel,
+            separator(),
+            metadataLabel
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -259,7 +265,8 @@ final class SettingsPopoverViewController: NSViewController {
             logsButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             launchAtLoginButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             quitButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            statusLabel.widthAnchor.constraint(equalTo: stack.widthAnchor)
+            statusLabel.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            metadataLabel.widthAnchor.constraint(equalTo: stack.widthAnchor)
         ])
     }
 

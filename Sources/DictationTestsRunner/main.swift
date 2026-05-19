@@ -33,7 +33,8 @@ enum DictationTestsRunner {
             TestCase(name: "audio chunk planner preserves overlap boundaries", run: testChunkPlanner),
             TestCase(name: "recording queue persists, retries, and completes audio jobs", run: testRecordingQueue),
             TestCase(name: "rolling logger keeps last ten entries and quotes metadata", run: testRollingLogger),
-            TestCase(name: "single-instance policy ignores current and terminated apps", run: testSingleInstancePolicy)
+            TestCase(name: "single-instance policy ignores current and terminated apps", run: testSingleInstancePolicy),
+            TestCase(name: "app metadata footer contains version and developer", run: testAppMetadataFooter)
         ]
 
         var failures: [(String, Error)] = []
@@ -219,6 +220,12 @@ func testSingleInstancePolicy() async throws {
         runningApplications: apps
     )
     try expect(none == nil, "Should ignore the current process and terminated apps")
+}
+
+func testAppMetadataFooter() async throws {
+    let footer = AppMetadata.footerText(version: "1.2.3")
+    try expect(footer.contains("Версия: 1.2.3"), "Footer should include localized version")
+    try expect(footer.contains("Разработчик: denis.lkg@gmail.com"), "Footer should include developer email")
 }
 
 func makeEvent(
