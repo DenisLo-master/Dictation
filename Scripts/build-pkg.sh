@@ -75,7 +75,7 @@ COPYFILE_DISABLE=1 COPY_EXTENDED_ATTRIBUTES_DISABLE=1 pkgbuild \
   --scripts "$PKG_SCRIPTS" \
   --install-location "/" \
   --identifier "dev.denis.Dictation.pkg" \
-  --version "0.1.15" \
+  --version "0.1.16" \
   "$PKG_PATH"
 
 echo "Built $PKG_PATH"

@@ -220,11 +220,11 @@ public enum AppText {
 
     public static func footer(version: String, developerEmail: String, language: AppLanguage) -> String {
         switch language {
-        case .english: "Version: \(version)\nDeveloper: \(developerEmail)"
-        case .russian: "Версия: \(version)\nРазработчик: \(developerEmail)"
-        case .spanish: "Versión: \(version)\nDesarrollador: \(developerEmail)"
-        case .turkish: "Sürüm: \(version)\nGeliştirici: \(developerEmail)"
-        case .german: "Version: \(version)\nEntwickler: \(developerEmail)"
+        case .english: "Version: \(version)\nCreated by: \(developerEmail)"
+        case .russian: "Версия: \(version)\nСоздано: \(developerEmail)"
+        case .spanish: "Versión: \(version)\nCreado por: \(developerEmail)"
+        case .turkish: "Sürüm: \(version)\nOluşturan: \(developerEmail)"
+        case .german: "Version: \(version)\nErstellt von: \(developerEmail)"
         }
     }
 

@@ -278,7 +278,7 @@ func testSingleInstancePolicy() async throws {
 func testAppMetadataFooter() async throws {
     let footer = AppMetadata.footerText(version: "1.2.3", language: .russian)
     try expect(footer.contains("Версия: 1.2.3"), "Footer should include localized version")
-    try expect(footer.contains("Разработчик: flo.production.studio@gmail.com"), "Footer should include developer email")
+    try expect(footer.contains("Создано: flo.production.studio@gmail.com"), "Footer should include creator email")
 }
 
 func makeEvent(

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.16 - 2026-05-20
+
+- Renamed the footer contact label from Developer to Created by.
+
 ## 0.1.15 - 2026-05-20
 
 - Updated the developer contact email to flo.production.studio@gmail.com.
