@@ -6,7 +6,7 @@ Please do not open a public GitHub issue for security problems, token-handling b
 
 Report security issues by email:
 
-`denis.lkg@gmail.com`
+`flo.production.studio@gmail.com`
 
 Include:
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.15 - 2026-05-20
+
+- Updated the developer contact email to flo.production.studio@gmail.com.
+
 ## 0.1.14 - 2026-05-20
 
 - Added UI language selection for English, Russian, Spanish, Turkish, and German.
