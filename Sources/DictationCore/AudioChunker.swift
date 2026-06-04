@@ -46,13 +46,18 @@ public struct AudioChunker: Sendable {
         let chunkCount = max(2, Int(ceil(Double(byteSize) / Double(maxChunkBytes))))
         let baseDuration = max(10, duration / Double(chunkCount))
 
-        return (0..<chunkCount).map { index in
-            AudioChunkPlan(
-                index: index,
-                start: max(0, Double(index) * baseDuration - (index == 0 ? 0 : overlapSeconds)),
-                end: min(duration, Double(index + 1) * baseDuration + overlapSeconds)
-            )
+        var plans: [AudioChunkPlan] = []
+        plans.reserveCapacity(chunkCount)
+
+        for index in 0..<chunkCount {
+            let chunkStart = Double(index) * baseDuration
+            let overlapBefore = index == 0 ? 0 : overlapSeconds
+            let start = max(0, chunkStart - overlapBefore)
+            let end = min(duration, Double(index + 1) * baseDuration + overlapSeconds)
+            plans.append(AudioChunkPlan(index: index, start: start, end: end))
         }
+
+        return plans
     }
 
     func chunks(for job: RecordingJob) async throws -> [AudioChunk] {
