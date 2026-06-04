@@ -21,9 +21,25 @@ struct KeychainStore {
 
     func save(_ value: String) throws {
         let data = Data(value.utf8)
-        try delete(ignoringNotFound: true)
+        let lookupQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let update: [String: Any] = [
+            kSecValueData as String: data
+        ]
 
-        let query: [String: Any] = [
+        let updateStatus = SecItemUpdate(lookupQuery as CFDictionary, update as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        guard updateStatus == errSecItemNotFound else {
+            throw StoreError.unhandledStatus(updateStatus)
+        }
+
+        let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
@@ -31,7 +47,7 @@ struct KeychainStore {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw StoreError.unhandledStatus(status)
         }

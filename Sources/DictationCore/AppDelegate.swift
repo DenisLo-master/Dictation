@@ -12,34 +12,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         logger: logger
     )
 
-    private let popover = NSPopover()
     private var statusItem: NSStatusItem?
     private var settingsViewController: SettingsPopoverViewController?
+    private var settingsWindowController: NSWindowController?
+    private var settingsMenuItem: NSMenuItem?
+    private var aboutMenuItem: NSMenuItem?
+    private var quitMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         try? AppPaths.prepare()
         logger.log(.info, "app_launched")
         configureApplicationMenu()
         configureStatusItem()
-        configurePopover()
         dictationController.onStatusChange = { [weak self] status in
             self?.settingsViewController?.setStatus(status)
         }
         dictationController.startHotkeyMonitoring()
         dictationController.discardPendingRecordings()
-        settingsViewController?.setStatus(AppText.ready(hotkey: settings.hotkey.displayName, language: settings.language))
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Dictation")
-        item.button?.imagePosition = .imageOnly
-        item.button?.target = self
-        item.button?.action = #selector(togglePopover(_:))
+        item.button?.title = item.button?.image == nil ? "D" : ""
+
+        let menu = NSMenu()
+        let settingsItem = menuItem(AppText.settings(settings.language), action: #selector(openSettings), keyEquivalent: ",")
+        let aboutItem = menuItem(AppText.about(settings.language), action: #selector(openAbout), keyEquivalent: "")
+        let quitItem = menuItem(AppText.quit(settings.language), action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(settingsItem)
+        menu.addItem(aboutItem)
+        menu.addItem(.separator())
+        menu.addItem(quitItem)
+        item.menu = menu
+
         statusItem = item
+        settingsMenuItem = settingsItem
+        aboutMenuItem = aboutItem
+        quitMenuItem = quitItem
     }
 
-    private func configurePopover() {
+    private func menuItem(_ title: String, action: Selector, keyEquivalent: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.target = self
+        return item
+    }
+
+    private func makeSettingsViewController() -> SettingsPopoverViewController {
         let controller = SettingsPopoverViewController(
             savedToken: settings.apiKey ?? "",
             selectedModel: settings.model,
@@ -86,18 +105,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onLaunchAtLoginChange = { [weak self, weak controller] enabled in
             self?.setLaunchAtLogin(enabled, controller: controller)
         }
-        controller.onQuit = {
-            NSApp.terminate(nil)
-        }
-
-        popover.behavior = .transient
-        popover.contentSize = NSSize(width: 390, height: 545)
-        popover.contentViewController = controller
-        settingsViewController = controller
 
         if settings.apiKey?.isEmpty == false {
             refreshModels(controller: controller, silent: true)
         }
+
+        return controller
+    }
+
+    private func configureSettingsWindowIfNeeded() {
+        guard settingsWindowController == nil else { return }
+
+        let controller = makeSettingsViewController()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = AppText.settings(settings.language)
+        window.contentViewController = controller
+        window.center()
+        window.isReleasedWhenClosed = false
+
+        settingsViewController = controller
+        settingsWindowController = NSWindowController(window: window)
+        controller.setStatus(AppText.ready(hotkey: settings.hotkey.displayName, language: settings.language))
     }
 
     private func configureApplicationMenu() {
@@ -121,6 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(editMenuItem)
 
         NSApp.mainMenu = mainMenu
+        applyStatusMenuLocalization()
     }
 
     private func saveAndValidateToken(_ token: String, controller: SettingsPopoverViewController?) {
@@ -138,8 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return
                 }
 
-                let models = try await modelService.fetchTranscriptionModels(apiKey: trimmedToken)
                 try settings.saveAPIKey(trimmedToken)
+                let models = try await modelService.fetchTranscriptionModels(apiKey: trimmedToken)
                 controller?.setModels(models, selectedModel: settings.model)
                 controller?.setValidationState(.success)
                 controller?.setStatus(AppText.tokenAcceptedModelsLoaded(settings.language))
@@ -203,14 +237,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func togglePopover(_ sender: AnyObject?) {
-        guard let button = statusItem?.button else { return }
+    private func applyStatusMenuLocalization() {
+        let language = settings.language
+        settingsMenuItem?.title = AppText.settings(language)
+        aboutMenuItem?.title = AppText.about(language)
+        quitMenuItem?.title = AppText.quit(language)
+        settingsWindowController?.window?.title = AppText.settings(language)
+    }
 
-        if popover.isShown {
-            popover.performClose(sender)
-        } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+    @objc private func openSettings() {
+        configureSettingsWindowIfNeeded()
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindowController?.showWindow(nil)
+    }
+
+    @objc private func openAbout() {
+        let language = settings.language
+        let alert = NSAlert()
+        alert.messageText = AppText.about(language)
+        alert.informativeText = AppText.aboutMessage(
+            version: AppMetadata.version(),
+            developerEmail: AppMetadata.developerEmail,
+            language: language
+        )
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: AppText.ok(language))
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    @objc private func quit() {
+        NSApp.terminate(nil)
     }
 }

@@ -17,7 +17,6 @@ final class SettingsPopoverViewController: NSViewController {
     var onRequestPermissions: (() -> Void)?
     var onOpenLogs: (() -> Void)?
     var onLaunchAtLoginChange: ((Bool) -> Void)?
-    var onQuit: (() -> Void)?
     var onHotkeyRecordingStateChange: ((Bool) -> Void)?
 
     private let savedToken: String
@@ -50,8 +49,6 @@ final class SettingsPopoverViewController: NSViewController {
     private let resetHotkeyButton = NSButton()
     private let permissionsButton = NSButton()
     private let logsButton = NSButton()
-    private let quitButton = NSButton()
-    private let metadataLabel = NSTextField(labelWithString: "")
 
     init(
         savedToken: String,
@@ -77,7 +74,7 @@ final class SettingsPopoverViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 545))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 500))
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
     }
@@ -165,8 +162,10 @@ final class SettingsPopoverViewController: NSViewController {
             ?? NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Dictation")
         headerIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 22, weight: .medium)
         headerIcon.contentTintColor = .controlAccentColor
+        headerIcon.translatesAutoresizingMaskIntoConstraints = false
+        headerIcon.widthAnchor.constraint(equalToConstant: 28).isActive = true
 
-        titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+        titleLabel.font = .boldSystemFont(ofSize: 24)
 
         let header = NSStackView(views: [headerIcon, titleLabel])
         header.orientation = .horizontal
@@ -216,12 +215,16 @@ final class SettingsPopoverViewController: NSViewController {
         saveButton.bezelStyle = .rounded
         saveButton.target = self
         saveButton.action = #selector(saveToken)
+        saveButton.translatesAutoresizingMaskIntoConstraints = false
+        saveButton.setContentHuggingPriority(.required, for: .horizontal)
+        saveButton.widthAnchor.constraint(equalToConstant: 112).isActive = true
 
         let tokenRow = NSStackView(views: [tokenField, validationBox, saveButton])
         tokenRow.orientation = .horizontal
         tokenRow.alignment = .centerY
         tokenRow.spacing = 8
         tokenField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        tokenField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         configureSectionLabel(modelLabel)
         configureIconButton(refreshButton, symbol: "arrow.clockwise", action: #selector(refreshModels), accessibilityDescription: AppText.refreshModels(language))
@@ -265,16 +268,12 @@ final class SettingsPopoverViewController: NSViewController {
         launchAtLoginButton.target = self
         launchAtLoginButton.action = #selector(launchAtLoginChanged)
 
-        configureRowButton(quitButton, symbol: "power", action: #selector(quit))
-
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.maximumNumberOfLines = 2
         statusLabel.lineBreakMode = .byWordWrapping
-
-        configureHintLabel(metadataLabel)
-        metadataLabel.maximumNumberOfLines = 2
-        metadataLabel.lineBreakMode = .byWordWrapping
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.heightAnchor.constraint(equalToConstant: 34).isActive = true
 
         let stack = NSStackView(views: [
             header,
@@ -292,21 +291,19 @@ final class SettingsPopoverViewController: NSViewController {
             permissionsButton,
             logsButton,
             launchAtLoginButton,
-            quitButton,
-            statusLabel,
-            separator(),
-            metadataLabel
+            statusLabel
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 9
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -24),
             languagePopup.widthAnchor.constraint(equalTo: stack.widthAnchor),
             tokenRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             modelHeader.widthAnchor.constraint(equalTo: stack.widthAnchor),
@@ -315,9 +312,7 @@ final class SettingsPopoverViewController: NSViewController {
             permissionsButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             logsButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             launchAtLoginButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            quitButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            statusLabel.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            metadataLabel.widthAnchor.constraint(equalTo: stack.widthAnchor)
+            statusLabel.widthAnchor.constraint(equalTo: stack.widthAnchor)
         ])
     }
 
@@ -392,9 +387,6 @@ final class SettingsPopoverViewController: NSViewController {
         logsButton.title = AppText.logs(language)
         logsButton.image = NSImage(systemSymbolName: "doc.text.magnifyingglass", accessibilityDescription: AppText.logs(language))
         launchAtLoginButton.title = AppText.launchAtLogin(language)
-        quitButton.title = AppText.quit(language)
-        quitButton.image = NSImage(systemSymbolName: "power", accessibilityDescription: AppText.quit(language))
-        metadataLabel.stringValue = AppMetadata.footerText(language: language)
         hotkeyField.language = language
 
         if let selectedModel = modelPopup.selectedItem?.representedObject as? String, !currentModels.isEmpty {
@@ -443,9 +435,5 @@ final class SettingsPopoverViewController: NSViewController {
 
     @objc private func launchAtLoginChanged() {
         onLaunchAtLoginChange?(launchAtLoginButton.state == .on)
-    }
-
-    @objc private func quit() {
-        onQuit?()
     }
 }

@@ -28,6 +28,36 @@ public enum AppLanguage: String, CaseIterable, Codable, Sendable {
 }
 
 public enum AppText {
+    public static func settings(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: "Settings"
+        case .russian: "Настройки"
+        case .spanish: "Ajustes"
+        case .turkish: "Ayarlar"
+        case .german: "Einstellungen"
+        }
+    }
+
+    public static func about(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: "About Dictation"
+        case .russian: "О Dictation"
+        case .spanish: "Acerca de Dictation"
+        case .turkish: "Dictation hakkında"
+        case .german: "Über Dictation"
+        }
+    }
+
+    public static func ok(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: "OK"
+        case .russian: "ОК"
+        case .spanish: "OK"
+        case .turkish: "Tamam"
+        case .german: "OK"
+        }
+    }
+
     public static func languageLabel(_ language: AppLanguage) -> String {
         switch language {
         case .english: "Language"
@@ -226,6 +256,10 @@ public enum AppText {
         case .turkish: "Sürüm: \(version)\nOluşturan: \(developerEmail)"
         case .german: "Version: \(version)\nErstellt von: \(developerEmail)"
         }
+    }
+
+    public static func aboutMessage(version: String, developerEmail: String, language: AppLanguage) -> String {
+        footer(version: version, developerEmail: developerEmail, language: language)
     }
 
     public static func hotkeyCapturePlaceholder(_ language: AppLanguage) -> String {
