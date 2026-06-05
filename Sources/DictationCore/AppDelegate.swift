@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var settingsViewController: SettingsPopoverViewController?
     private var settingsWindowController: NSWindowController?
+    private var aboutWindowController: NSWindowController?
     private var settingsMenuItem: NSMenuItem?
     private var aboutMenuItem: NSMenuItem?
     private var quitMenuItem: NSMenuItem?
@@ -249,6 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         aboutMenuItem?.title = AppText.about(language)
         quitMenuItem?.title = AppText.quit(language)
         settingsWindowController?.window?.title = AppText.settings(language)
+        aboutWindowController?.window?.title = AppText.about(language)
     }
 
     @objc private func openSettings() {
@@ -259,17 +261,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openAbout() {
         let language = settings.language
-        let alert = NSAlert()
-        alert.messageText = AppText.about(language)
-        alert.informativeText = AppText.aboutMessage(
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 220),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = AppText.about(language)
+        panel.isReleasedWhenClosed = false
+        panel.center()
+
+        let contentView = NSView()
+        contentView.wantsLayer = true
+        contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        panel.contentView = contentView
+
+        let iconView = NSImageView()
+        iconView.image = NSImage(systemSymbolName: "laptopcomputer.and.mic", accessibilityDescription: "Dictation")
+            ?? NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Dictation")
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 26, weight: .medium)
+        iconView.contentTintColor = .controlAccentColor
+        iconView.imageScaling = .scaleProportionallyDown
+        iconView.wantsLayer = true
+        iconView.layer?.backgroundColor = NSColor.clear.cgColor
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = NSTextField(labelWithString: AppText.about(language))
+        titleLabel.font = .boldSystemFont(ofSize: 22)
+
+        let messageLabel = NSTextField(labelWithString: AppText.aboutMessage(
             version: AppMetadata.version(),
             developerEmail: AppMetadata.developerEmail,
             language: language
-        )
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: AppText.ok(language))
+        ))
+        messageLabel.font = .systemFont(ofSize: 13)
+        messageLabel.textColor = .secondaryLabelColor
+        messageLabel.maximumNumberOfLines = 0
+        messageLabel.lineBreakMode = .byWordWrapping
+
+        let textStack = NSStackView(views: [titleLabel, messageLabel])
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 8
+
+        let headerStack = NSStackView(views: [iconView, textStack])
+        headerStack.orientation = .horizontal
+        headerStack.alignment = .top
+        headerStack.spacing = 14
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(headerStack)
+
+        let okButton = NSButton(title: AppText.ok(language), target: self, action: #selector(closeAbout))
+        okButton.bezelStyle = .rounded
+        okButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(okButton)
+
+        NSLayoutConstraint.activate([
+            iconView.widthAnchor.constraint(equalToConstant: 30),
+            iconView.heightAnchor.constraint(equalToConstant: 30),
+            headerStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 28),
+            headerStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -28),
+            headerStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 28),
+            okButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -28),
+            okButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -22),
+            okButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 84)
+        ])
+
+        aboutWindowController = NSWindowController(window: panel)
         NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        aboutWindowController?.showWindow(nil)
+    }
+
+    @objc private func closeAbout() {
+        aboutWindowController?.close()
     }
 
     @objc private func quit() {

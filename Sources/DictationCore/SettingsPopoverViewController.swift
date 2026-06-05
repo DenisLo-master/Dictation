@@ -168,8 +168,14 @@ final class SettingsPopoverViewController: NSViewController {
             ?? NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Dictation")
         headerIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 22, weight: .medium)
         headerIcon.contentTintColor = .controlAccentColor
+        headerIcon.imageScaling = .scaleProportionallyDown
+        headerIcon.wantsLayer = true
+        headerIcon.layer?.backgroundColor = NSColor.clear.cgColor
         headerIcon.translatesAutoresizingMaskIntoConstraints = false
-        headerIcon.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        NSLayoutConstraint.activate([
+            headerIcon.widthAnchor.constraint(equalToConstant: 24),
+            headerIcon.heightAnchor.constraint(equalToConstant: 24)
+        ])
 
         titleLabel.font = .boldSystemFont(ofSize: 24)
 
