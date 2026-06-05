@@ -77,6 +77,7 @@ final class SettingsPopoverViewController: NSViewController {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 500))
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        preferredContentSize = NSSize(width: 520, height: 500)
     }
 
     override func viewDidLoad() {
@@ -92,7 +93,12 @@ final class SettingsPopoverViewController: NSViewController {
     }
 
     func setStatus(_ value: String) {
-        statusLabel.stringValue = value
+        let singleLine = value.replacingOccurrences(of: "\n", with: " ")
+        if singleLine.count > 220 {
+            statusLabel.stringValue = "\(singleLine.prefix(217))..."
+        } else {
+            statusLabel.stringValue = singleLine
+        }
     }
 
     func setValidationState(_ state: ValidationState) {
@@ -176,6 +182,7 @@ final class SettingsPopoverViewController: NSViewController {
         configureHintLabel(languageHintLabel)
         languagePopup.target = self
         languagePopup.action = #selector(languageChanged)
+        languagePopup.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         languagePopup.removeAllItems()
         for appLanguage in AppLanguage.allCases {
             languagePopup.addItem(withTitle: appLanguage.displayName)
@@ -186,6 +193,7 @@ final class SettingsPopoverViewController: NSViewController {
         tokenField.placeholderString = "sk-..."
         tokenField.stringValue = savedToken
         tokenField.bezelStyle = .roundedBezel
+        tokenField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         validationSpinner.style = .spinning
         validationSpinner.controlSize = .small
@@ -239,6 +247,7 @@ final class SettingsPopoverViewController: NSViewController {
 
         modelPopup.target = self
         modelPopup.action = #selector(modelChanged)
+        modelPopup.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         configureHintLabel(modelHintLabel)
 
         resetHotkeyButton.bezelStyle = .rounded
@@ -270,9 +279,10 @@ final class SettingsPopoverViewController: NSViewController {
 
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
-        statusLabel.maximumNumberOfLines = 2
-        statusLabel.lineBreakMode = .byWordWrapping
+        statusLabel.maximumNumberOfLines = 1
+        statusLabel.lineBreakMode = .byTruncatingTail
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         statusLabel.heightAnchor.constraint(equalToConstant: 34).isActive = true
 
         let stack = NSStackView(views: [

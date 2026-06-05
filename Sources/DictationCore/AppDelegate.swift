@@ -2,6 +2,8 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let settingsWindowSize = NSSize(width: 520, height: 500)
+
     private let settings = AppSettings()
     private let logger = AppLogger()
     private let overlay = EqualizerOverlayController()
@@ -118,13 +120,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let controller = makeSettingsViewController()
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
+            contentRect: NSRect(origin: .zero, size: Self.settingsWindowSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = AppText.settings(settings.language)
         window.contentViewController = controller
+        window.contentMinSize = Self.settingsWindowSize
+        window.contentMaxSize = Self.settingsWindowSize
+        window.minSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: Self.settingsWindowSize)).size
+        window.maxSize = window.minSize
         window.center()
         window.isReleasedWhenClosed = false
 
