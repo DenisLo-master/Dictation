@@ -21,12 +21,14 @@ final class EqualizerOverlayController {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        configurePanelForOverlay()
     }
 
     func showPreparing() {
         stopPulse()
+        configurePanelForOverlay()
         positionBottomRight()
         equalizerView.mode = .preparing
         equalizerView.resetLevels()
@@ -36,6 +38,7 @@ final class EqualizerOverlayController {
 
     func showRecording() {
         stopPulse()
+        configurePanelForOverlay()
         positionBottomRight()
         equalizerView.mode = .recording
         equalizerView.resetLevels()
@@ -55,6 +58,7 @@ final class EqualizerOverlayController {
         stopPulse()
         equalizerView.mode = .transcribing
         if !panel.isVisible {
+            configurePanelForOverlay()
             positionBottomRight()
             panel.orderFrontRegardless()
         }
@@ -79,13 +83,32 @@ final class EqualizerOverlayController {
         }
     }
 
+    private func configurePanelForOverlay() {
+        panel.level = .screenSaver
+        panel.collectionBehavior = [
+            .canJoinAllSpaces,
+            .fullScreenAuxiliary,
+            .stationary,
+            .transient,
+            .ignoresCycle
+        ]
+    }
+
     private func positionBottomRight() {
-        let frame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
+        let screen = screenForCurrentPointer() ?? NSScreen.main ?? NSScreen.screens.first
+        let frame = screen?.visibleFrame ?? .zero
         let origin = NSPoint(
             x: frame.maxX - size.width - 24,
             y: frame.minY + 24
         )
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+
+    private func screenForCurrentPointer() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first { screen in
+            screen.frame.contains(mouseLocation)
+        }
     }
 
     private func startPulse() {

@@ -23,7 +23,7 @@ final class DictationController {
     private var pendingStartTask: Task<Void, Never>?
     private var insertionTargetApplication: NSRunningApplication?
 
-    private let hotkeyHoldDebounceNanoseconds: UInt64 = 180_000_000
+    private let hotkeyHoldDebounceNanoseconds: UInt64 = 300_000_000
     private let minimumRecordingDuration: TimeInterval = 0.35
 
     init(settings: AppSettings, overlay: EqualizerOverlayController, logger: AppLogger) {
@@ -111,7 +111,7 @@ final class DictationController {
         guard pendingStartTask == nil else { return }
 
         pendingStartTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: self?.hotkeyHoldDebounceNanoseconds ?? 180_000_000)
+            try? await Task.sleep(nanoseconds: self?.hotkeyHoldDebounceNanoseconds ?? 300_000_000)
             await MainActor.run {
                 guard let self, self.isHotkeyDown, !Task.isCancelled else { return }
                 self.pendingStartTask = nil
